@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./tmp/spec",
+    "types": ["jest", "node"],
+    "module": "CommonJS",
+    "allowJs": true
+  },
+  "files": ["src/test-setup.ts"],
+  "include": ["src/**/*.spec.ts"]
+}

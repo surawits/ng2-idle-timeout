@@ -1,0 +1,18 @@
+{
+  "sprint": 1,
+  "task": "S1-T2",
+  "status": "done",
+  "started_at": "2025-09-26T08:30:01Z",
+  "completed_at": "2025-09-26T08:35:00Z",
+  "artifacts": [
+    "packages/ng2-idle-timeout/src/lib/defaults.ts",
+    "packages/ng2-idle-timeout/src/lib/validation.ts",
+    "packages/ng2-idle-timeout/src/lib/utils/logging.ts"
+  ],
+  "hashes": {
+    "packages/ng2-idle-timeout/src/lib/defaults.ts": "sha256-e5daef2a59dab5578785b825502ad138a9d3388bb8b15fdf104c6ff5f55df8b8",
+    "packages/ng2-idle-timeout/src/lib/validation.ts": "sha256-76a32fb64325425f4641f771f99880080ad0a04b5977846993c825fdd0727452",
+    "packages/ng2-idle-timeout/src/lib/utils/logging.ts": "sha256-5edd15c026255d6e088f28a9f5da749acbed98e3f7f99f7fe2ad7ad26718280d"
+  },
+  "notes": "Defaults, validation, and logging wired for FSM"
+}

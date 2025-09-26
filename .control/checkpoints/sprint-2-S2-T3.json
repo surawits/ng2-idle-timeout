@@ -1,0 +1,18 @@
+{
+  "sprint": 2,
+  "task": "S2-T3",
+  "status": "done",
+  "started_at": "2025-09-26T09:40:01Z",
+  "completed_at": "2025-09-26T09:55:00Z",
+  "artifacts": [
+    "README.md",
+    "packages/ng2-idle-timeout/src/public-api.ts",
+    "packages/ng2-idle-timeout/src/lib/services/session-timeout.service.ts"
+  ],
+  "hashes": {
+    "README.md": "sha256-970fc9ee7c3541ac0c632099d635976bb86980a0cce0d152bf285aa11b5f7c68",
+    "packages/ng2-idle-timeout/src/public-api.ts": "sha256-a1a2839ff2e8cb1abc08ea50b4e324906dad882c0dca4dee1c8f566b341243e2",
+    "packages/ng2-idle-timeout/src/lib/services/session-timeout.service.ts": "sha256-f467a21a9e9ba638760999e18ee38aae030649a78b15c6589282a23b617e9290"
+  },
+  "notes": "Configuration persistence wiring exposed and README updated for Sprint 2"
+}

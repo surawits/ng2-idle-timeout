@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./tmp",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": true
+  },
+  "files": [],
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/test-setup.ts", "**/*.spec.ts"]
+}

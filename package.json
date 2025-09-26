@@ -1,0 +1,27 @@
+{
+  "name": "ng2-idle-timeout-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "schematics/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=ng2-idle-timeout",
+    "build:lib": "npm run build --workspace=ng2-idle-timeout",
+    "lint": "npm run lint --workspace=ng2-idle-timeout",
+    "test": "npm run test --workspace=ng2-idle-timeout",
+    "test:unit": "npm run test --workspace=ng2-idle-timeout",
+    "test:e2e": "npm run test:e2e --workspace=demo-app",
+    "format": "prettier --write \"**/*.{ts,js,json,md}\"",
+    "control:inspect": "node --experimental-strip-types scripts/control/inspect.ts"
+  },
+  "engines": {
+    "node": ">=18.13.0",
+    "npm": ">=9"
+  },
+  "devDependencies": {
+    "prettier": "3.2.5"
+  }
+}

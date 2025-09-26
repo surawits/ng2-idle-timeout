@@ -1,0 +1,10 @@
+{
+  "current_sprint": 3,
+  "current_task": "S3-T1",
+  "last_successful_commit": "0000000",
+  "last_release": null,
+  "env": {
+    "angular": ">=16 <=20",
+    "zoneless": true
+  }
+}

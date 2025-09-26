@@ -1,0 +1,22 @@
+{
+  "root": true,
+  "ignorePatterns": ["dist", "coverage"],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": ["./tsconfig.lib.json", "./tsconfig.spec.json"],
+    "sourceType": "module"
+  },
+  "plugins": ["@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  "rules": {
+    "@typescript-eslint/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "@typescript-eslint/no-floating-promises": "error",
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='setTimeout']",
+        "message": "Use scheduler utilities instead of raw setTimeout to stay zoneless-safe."
+      }
+    ]
+  }
+}
