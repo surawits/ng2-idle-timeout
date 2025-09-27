@@ -157,3 +157,32 @@ sprints:
           - "apps/demo/README.md"
         tests:
           - "npm run test --workspace=demo-app"
+  - id: 7
+    name: "Documentation & Playground"
+    tasks:
+      - id: "S7-T1"
+        title: "Documentation route & layout"
+        done_condition: "Docs route renders usage guides with PrimeNG styling"
+        outputs:
+          - "apps/experience/src/app/docs/docs.component.ts"
+          - "apps/experience/src/app/docs/docs.component.html"
+        tests:
+          - "npm run demo:test"
+      - id: "S7-T2"
+        title: "Interactive playground"
+        done_condition: "Live config controls drive SessionTimeoutService state"
+        outputs:
+          - "apps/experience/src/app/playground/playground.component.ts"
+          - "apps/experience/src/app/playground/playground.component.html"
+        tests:
+          - "npm run demo:test"
+      - id: "S7-T3"
+        title: "Scripts & verification"
+        done_condition: "Demo app build/test scripts documented and passing"
+        outputs:
+          - "package.json"
+          - "README.md"
+          - "RELEASE_NOTES.md"
+        tests:
+          - "npm run demo:build"
+          - "npm run demo:test"

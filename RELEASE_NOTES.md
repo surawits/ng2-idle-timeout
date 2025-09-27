@@ -11,4 +11,4 @@
 - npm run build --workspace=ng2-idle-timeout
 - npm run test --workspace=ng2-idle-timeout
 - npm run test --workspace=schematics/ng-add
-- npm run test --workspace=demo-app
+- npm run test --workspace=demo-app\n---\n\n# Sprint 7 Notes\n\n## Highlights\n- Angular 18 PrimeNG experience app delivers documentation and an interactive playground.\n- Live playground lets you tweak idle/countdown thresholds, emit activity, and trigger server-sync auto resume.\n- Workspace scripts (demo:start, demo:build, demo:test) make it easy to run and verify the demo.\n\n## Testing\n- npm run demo:start (manual spot check)\n- npm run demo:build\n- npm run demo:test\n

@@ -1,0 +1,219 @@
+<section class="page-hero">
+  <div class="hero-copy">
+    <p class="eyebrow">Playground</p>
+    <h1>Prototype idle and timeout flows without leaving the browser.</h1>
+    <p class="lead">
+      Adjust timers, simulate activity, and watch the session timeline update in real time. Use this sandbox to map the
+      configuration that ships to production.
+    </p>
+    <div class="hero-actions">
+      <button type="button" class="btn btn-outline-primary rounded-pill" (click)="navigateToDocs()">
+        Back to Docs
+      </button>
+      <button type="button" class="btn btn-primary rounded-pill" (click)="extend()">
+        <i class="bi bi-plus-circle"></i>
+        Extend session
+      </button>
+    </div>
+    <div class="badge-strip">
+      <span *ngFor="let badge of heroBadges" class="badge bg-light text-dark border">{{ badge }}</span>
+    </div>
+  </div>
+  <div class="hero-card card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">Best results</h5>
+      <ul class="list-unstyled">
+        <li><i class="bi bi-check-circle-fill text-success"></i> Keep the tab open in parallel with your running application.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Mirror the configuration values your team plans to ship.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Use the event log to export scenarios into automated tests.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider" />
+
+<div class="playground-grid">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h3 class="card-title">Configuration</h3>
+      <h6 class="card-subtitle mb-3 text-muted">Update values to see changes instantly</h6>
+
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="idle">Idle grace (seconds)</label>
+          <input
+            id="idle"
+            type="number"
+            class="form-control"
+            [(ngModel)]="idleGraceSeconds"
+            (ngModelChange)="applyConfig()"
+            step="5"
+            min="5"
+            max="1800"
+          />
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="countdown">Countdown length (seconds)</label>
+          <input
+            id="countdown"
+            type="number"
+            class="form-control"
+            [(ngModel)]="countdownSeconds"
+            (ngModelChange)="applyConfig()"
+            step="15"
+            min="60"
+            max="7200"
+          />
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="warn">Warn before expiry (seconds)</label>
+          <input
+            id="warn"
+            type="number"
+            class="form-control"
+            [(ngModel)]="warnBeforeSeconds"
+            (ngModelChange)="applyConfig()"
+            step="15"
+            min="15"
+            [max]="countdownSeconds"
+          />
+        </div>
+        <div class="col-12 col-md-6 d-flex align-items-end">
+          <div class="form-check form-switch w-100">
+            <input
+              id="autoResume"
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              [(ngModel)]="autoResume"
+              (change)="applyConfig()"
+            />
+            <label class="form-check-label" for="autoResume">Auto resume on server sync</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions mt-4 d-flex flex-wrap gap-3">
+        <button type="button" class="btn btn-outline-secondary" (click)="pause()">
+          <i class="bi bi-pause-circle"></i>
+          Pause
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="resume()">
+          <i class="bi bi-play-circle"></i>
+          Resume
+        </button>
+        <button type="button" class="btn btn-outline-primary" (click)="extend()">
+          <i class="bi bi-plus-circle"></i>
+          Extend
+        </button>
+        <button type="button" class="btn btn-light" (click)="resetIdle('dom')">
+          <i class="bi bi-display"></i>
+          Simulate DOM activity
+        </button>
+        <button type="button" class="btn btn-light" (click)="resetIdle('http')">
+          <i class="bi bi-cloud-arrow-repeat"></i>
+          Simulate HTTP activity
+        </button>
+        <button type="button" class="btn btn-outline-success" (click)="triggerServerSync()">
+          <i class="bi bi-arrow-repeat"></i>
+          Trigger server sync
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h3 class="card-title">Session telemetry</h3>
+      <h6 class="card-subtitle mb-3 text-muted">Live insight into the timeout cycle</h6>
+
+      <div class="telemetry-metrics">
+        <div class="metric border rounded-3">
+          <span class="metric-label">Idle remaining</span>
+          <span class="metric-value">{{ idleRemainingSeconds() | number: '1.1-1' }} s</span>
+        </div>
+        <div class="metric border rounded-3">
+          <span class="metric-label">Countdown remaining</span>
+          <span class="metric-value">{{ countdownRemainingSeconds() | number: '1.1-1' }} s</span>
+        </div>
+        <div class="metric border rounded-3">
+          <span class="metric-label">Warning window</span>
+          <span class="metric-value">{{ warningWindowSeconds() | number: '1.0-0' }} s</span>
+        </div>
+      </div>
+
+      <div class="telemetry-state">
+        <span class="label">State</span>
+        <span class="badge" [attr.class]="'badge ' + sessionBadgeClass()">{{ sessionState() }}</span>
+      </div>
+
+      <div class="telemetry-target d-flex justify-content-between align-items-baseline gap-3 py-2 mb-3 border-top pt-3">
+        <span class="label fw-semibold text-secondary">Countdown ends</span>
+        <span class="value">
+          {{ countdownTargetDate() ? (countdownTargetDate() | date: 'dd MMMM yyyy HH:mm:ss') : '—' }}
+        </span>
+      </div>
+
+      <div class="row g-3 telemetry-lists">
+        <div class="col-12 col-lg-6">
+          <div class="list-card border rounded-3 p-3">
+            <h6 class="text-uppercase text-muted small mb-2">Recent events</h6>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <tbody>
+                  <tr *ngFor="let event of pagedEvents">
+                    <td>
+                      <div class="fw-medium">{{ event.type }}</div>
+                      <div class="text-muted small">{{ event.state }} • {{ event.timeLabel }}</div>
+                      <div class="text-muted small" *ngIf="event.metaSummary">{{ event.metaSummary }}</div>
+                    </td>
+                    <td class="text-end text-nowrap">{{ event.remainingSeconds }} s</td>
+                  </tr>
+                  <tr *ngIf="events.length === 0">
+                    <td colspan="2" class="text-muted">Interact with the controls to emit events.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination-controls d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3 mt-auto">
+              <small>Page {{ events.length === 0 ? 1 : eventPage + 1 }} of {{ events.length === 0 ? 1 : eventPageCount }}</small>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" (click)="prevEventPage()" [disabled]="eventPage === 0">Prev</button>
+                <button type="button" class="btn btn-outline-secondary" (click)="nextEventPage()" [disabled]="eventPage >= eventPageCount - 1 || events.length === 0">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="list-card border rounded-3 p-3">
+            <h6 class="text-uppercase text-muted small mb-2">Activity</h6>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <tbody>
+                  <tr *ngFor="let activity of pagedActivity">
+                    <td>
+                      <div class="fw-medium">{{ activity.summary }}</div>
+                      <div class="text-muted small">{{ activity.at | date: 'HH:mm:ss' }}</div>
+                      <div class="text-muted small" *ngIf="activity.detail">{{ activity.detail }}</div>
+                    </td>
+                  </tr>
+                  <tr *ngIf="activityLog.length === 0">
+                    <td class="text-muted">Activity will appear here when you reset idle.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination-controls d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-between gap-3 mt-auto">
+              <small>Page {{ activityLog.length === 0 ? 1 : activityPage + 1 }} of {{ activityLog.length === 0 ? 1 : activityPageCount }}</small>
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" (click)="prevActivityPage()" [disabled]="activityPage === 0">Prev</button>
+                <button type="button" class="btn btn-outline-secondary" (click)="nextActivityPage()" [disabled]="activityPage >= activityPageCount - 1 || activityLog.length === 0">Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

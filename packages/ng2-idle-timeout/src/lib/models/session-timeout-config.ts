@@ -1,4 +1,4 @@
-import type { ActivityEvent } from './activity-event';
+﻿import type { ActivityEvent } from './activity-event';
 
 export type SessionTimeoutStrategy = 'userOnly' | 'userAndHttpAllowlist' | 'aggressive';
 
@@ -15,6 +15,16 @@ export interface HttpActivityPolicyConfig {
   primaryTabOnly: boolean;
 }
 
+export interface SessionActionDelays {
+  start: number;
+  stop: number;
+  resetIdle: number;
+  extend: number;
+  pause: number;
+  resume: number;
+  expire: number;
+}
+
 export interface SessionTimeoutConfig {
   idleGraceMs: number;
   countdownMs: number;
@@ -24,6 +34,7 @@ export interface SessionTimeoutConfig {
   appInstanceId?: string;
   strategy: SessionTimeoutStrategy;
   httpActivity: HttpActivityPolicyConfig;
+  actionDelays: SessionActionDelays;
   openNewTabBehavior: 'inherit';
   routerCountsAsActivity: boolean;
   debounceMouseMs: number;
@@ -35,10 +46,12 @@ export interface SessionTimeoutConfig {
   logging: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'silent';
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
+  resumeBehavior?: 'manual' | 'autoOnServerSync';
 }
 
-export type SessionTimeoutPartialConfig = Partial<SessionTimeoutConfig> & {
+export type SessionTimeoutPartialConfig = Partial<Omit<SessionTimeoutConfig, 'httpActivity' | 'actionDelays'>> & {
   httpActivity?: Partial<HttpActivityPolicyConfig>;
+  actionDelays?: Partial<SessionActionDelays>;
 };
 
 export interface ExpireCallback {

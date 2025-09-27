@@ -1,0 +1,106 @@
+<section class="page-hero">
+  <div class="hero-copy">
+    <p class="eyebrow">Documentation</p>
+    <h1>Design session-aware Angular UX with confidence.</h1>
+    <p class="lead">
+      Use ng2-idle-timeout to standardise idle detection, cross-tab coordination, and compliance-friendly timeout flows.
+      These docs walk through the moving parts while the playground lets you experiment with real service events.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary rounded-pill" href="#install">Install</a>
+      <a class="btn btn-outline-primary rounded-pill" routerLink="/playground">Open Playground</a>
+    </div>
+    <div class="badge-strip">
+      <span *ngFor="let badge of heroBadges" class="badge bg-light text-dark border">{{ badge }}</span>
+    </div>
+  </div>
+  <div class="hero-card card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">What you'll find</h5>
+      <ul class="list-unstyled">
+        <li><i class="bi bi-check-circle-fill text-success"></i> Install schematics, providers, and configuration patterns.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Recipes for multi-tab sync, HTTP interceptors, and pausing flow.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Workspace scripts to lint, test, and ship the library.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider" />
+
+<section class="docs-layout">
+  <div class="primary">
+    <div id="install" class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title">Install</h3>
+        <h6 class="card-subtitle mb-3 text-muted">Add the package and schematic</h6>
+        <div class="command-list">
+          <div *ngFor="let cmd of installCommands" class="command">
+            <code>{{ cmd }}</code>
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="copy(cmd)">
+              <i class="bi bi-clipboard"></i>
+              Copy
+            </button>
+          </div>
+        </div>
+        <p class="helper">
+          The schematic wires default providers, creates <code>session-timeout.providers.ts</code>, and spreads them into
+          <code>app.config.ts</code> so the service is ready immediately.
+        </p>
+        <p class="helper">
+          Need troubleshooting tips? Visit the <a routerLink="/faq">FAQ</a> for common configuration errors.
+        </p>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title">Quick start</h3>
+        <h6 class="card-subtitle mb-3 text-muted">Drop-in providers</h6>
+        <div class="code-block">
+          <pre><code>{{ providerSnippet }}</code></pre>
+        </div>
+        <div class="code-block">
+          <pre><code>{{ configSnippet }}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="secondary">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title">Recipes</h3>
+        <h6 class="card-subtitle mb-3 text-muted">Practical tweaks</h6>
+        <div class="recipe">
+          <span class="badge text-bg-info">Multi-tab</span>
+          <p>Assign the same <code>storageKeyPrefix</code> in every tab so extends/expirations stay in sync.</p>
+        </div>
+        <div class="recipe">
+          <span class="badge text-bg-success">HTTP</span>
+          <p>Let the interceptor reset idle for allowlisted calls or backend-marked requests.</p>
+        </div>
+        <div class="recipe">
+          <span class="badge text-bg-warning">Pause/Resume</span>
+          <p>
+            Set <code>resumeBehavior: 'autoOnServerSync'</code> when you want the next successful server sync to resume a
+            paused session automatically.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title">Workspace scripts</h3>
+        <h6 class="card-subtitle mb-3 text-muted">Keep quality high</h6>
+        <ul class="script-list">
+          <li *ngFor="let script of scripts">
+            <code>{{ script.command }}</code>
+            <span>{{ script.description }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </aside>
+</section>

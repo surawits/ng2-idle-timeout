@@ -39,6 +39,15 @@ describe('SessionActivityHttpInterceptor', () => {
       onlyWhenTabFocused: false,
       primaryTabOnly: false
     },
+    actionDelays: {
+      start: 0,
+      stop: 0,
+      resetIdle: 0,
+      extend: 0,
+      pause: 0,
+      resume: 0,
+      expire: 0
+    },
     openNewTabBehavior: 'inherit',
     routerCountsAsActivity: true,
     debounceMouseMs: 800,

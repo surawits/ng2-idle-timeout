@@ -1,0 +1,71 @@
+<section class="hero">
+  <div class="hero-content">
+    <p class="eyebrow">Session intelligence for modern Angular teams</p>
+    <h1>Build trustworthy idle and timeout experiences without the guesswork.</h1>
+    <p class="lead">
+      ng2-idle-timeout orchestrates user activity detection, warnings, and logout flows so you can ship
+      compliant, user-friendly security in record time.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-lg rounded-pill" routerLink="/docs">Get Started</a>
+      <a class="btn btn-outline-primary btn-lg rounded-pill" routerLink="/playground">See Playground</a>
+    </div>
+    <div class="badge-strip">
+      <span *ngFor="let badge of badges" class="badge bg-light text-dark border">{{ badge }}</span>
+    </div>
+  </div>
+  <div class="hero-card card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">Customer-facing safety net</h5>
+      <p class="card-subtitle text-muted mb-3">
+        Configure warning modals, background sync, and auto-resume flows without leaving Angular.
+      </p>
+      <ul class="list-unstyled">
+        <li><i class="bi bi-check-circle-fill text-success"></i> Tune idle timers per feature area and audience.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Coordinate logout between tabs with storage sync built-in.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Instrument warning prompts and analytics events effortlessly.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="section-divider" />
+
+<section class="features">
+  <header>
+    <h2>Why product teams choose ng2-idle-timeout</h2>
+    <p>Opinionated building blocks that stay out of your way while keeping sessions secure.</p>
+  </header>
+  <div class="feature-grid">
+    <div *ngFor="let feature of features" class="feature-card card shadow-sm">
+      <div class="card-body">
+        <span class="feature-icon"><i class="bi {{ feature.icon }}"></i></span>
+        <h3>{{ feature.title }}</h3>
+        <p>{{ feature.description }}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="showcase">
+  <div *ngFor="let item of showcase" class="showcase-card card shadow-sm">
+    <div class="card-body d-flex flex-column">
+      <h3 class="card-title">{{ item.title }}</h3>
+      <p class="card-text">{{ item.blurb }}</p>
+      <div class="mt-auto">
+        <a class="btn btn-link ps-0" [routerLink]="item.routerLink">{{ item.ctaLabel }} <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <header>
+    <h2>Ready to keep users informed and secure?</h2>
+    <p>Drop ng2-idle-timeout into your workspace, configure session policies, and let the runtime handle the rest.</p>
+  </header>
+  <div class="cta-actions">
+    <a class="btn btn-primary rounded-pill" routerLink="/docs">Install Package</a>
+    <a class="btn btn-outline-primary rounded-pill" routerLink="/playground">Launch Playground</a>
+  </div>
+</section>

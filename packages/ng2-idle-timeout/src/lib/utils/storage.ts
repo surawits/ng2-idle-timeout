@@ -1,8 +1,9 @@
-import { inject } from '@angular/core';
+﻿import { inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 
 import type { SessionSnapshot, SessionState } from '../models/session-state';
-import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import type { SessionActionDelays, SessionTimeoutConfig } from '../models/session-timeout-config';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 
 export interface StorageAdapter {
   read(key: string): string | null;
@@ -34,6 +35,7 @@ interface SerializedConfig {
   storageKeyPrefix: string;
   strategy: SessionTimeoutConfig['strategy'];
   httpActivity: SerializedHttpConfig;
+  actionDelays?: Partial<SessionActionDelays>;
   openNewTabBehavior: SessionTimeoutConfig['openNewTabBehavior'];
   routerCountsAsActivity: boolean;
   debounceMouseMs: number;
@@ -166,6 +168,7 @@ function serializeConfig(config: SessionTimeoutConfig): SerializedConfig {
     storageKeyPrefix: config.storageKeyPrefix,
     strategy: config.strategy,
     httpActivity: serializeHttpConfig(config.httpActivity),
+    actionDelays: { ...config.actionDelays },
     openNewTabBehavior: config.openNewTabBehavior,
     routerCountsAsActivity: config.routerCountsAsActivity,
     debounceMouseMs: config.debounceMouseMs,
@@ -200,6 +203,11 @@ function serializeRegExp(value: RegExp): { source: string; flags: string } {
 }
 
 function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
+  const mergedDelays: SessionActionDelays = {
+    ...DEFAULT_SESSION_TIMEOUT_CONFIG.actionDelays,
+    ...(serialized.actionDelays ?? {})
+  };
+
   return {
     idleGraceMs: serialized.idleGraceMs,
     countdownMs: serialized.countdownMs,
@@ -209,6 +217,7 @@ function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
     appInstanceId: undefined,
     strategy: serialized.strategy,
     httpActivity: deserializeHttpConfig(serialized.httpActivity),
+    actionDelays: mergedDelays,
     openNewTabBehavior: serialized.openNewTabBehavior,
     routerCountsAsActivity: serialized.routerCountsAsActivity,
     debounceMouseMs: serialized.debounceMouseMs,
@@ -246,3 +255,4 @@ function reviveRegExp(serialized: { source: string; flags: string }): RegExp {
     return new RegExp(serialized.source);
   }
 }
+

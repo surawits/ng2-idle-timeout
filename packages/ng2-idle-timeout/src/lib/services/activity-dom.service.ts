@@ -98,12 +98,34 @@ export class ActivityDomService {
       return;
     }
 
+    const meta: Record<string, unknown> = {
+      type: event.type
+    };
+
+    if (typeof KeyboardEvent !== 'undefined' && event instanceof KeyboardEvent) {
+      meta['key'] = event.key;
+      meta['ctrlKey'] = event.ctrlKey;
+      meta['shiftKey'] = event.shiftKey;
+      meta['altKey'] = event.altKey;
+    } else if (typeof MouseEvent !== 'undefined' && event instanceof MouseEvent) {
+      meta['button'] = event.button;
+      meta['clientX'] = Math.round(event.clientX);
+      meta['clientY'] = Math.round(event.clientY);
+    } else if (typeof TouchEvent !== 'undefined' && event instanceof TouchEvent) {
+      meta['touches'] = event.touches?.length ?? 0;
+    } else if (typeof InputEvent !== 'undefined' && event instanceof InputEvent) {
+      meta['inputType'] = event.inputType;
+    }
+
+    const target = event.target as Element | null;
+    if (target instanceof Element) {
+      meta['target'] = target.tagName.toLowerCase();
+    }
+
     this.eventsSubject.next({
       source: 'dom',
       at: now,
-      meta: {
-        type: event.type
-      }
+      meta
     });
   }
 

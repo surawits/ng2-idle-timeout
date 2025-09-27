@@ -1,4 +1,4 @@
-import type { SessionTimeoutConfig } from './models/session-timeout-config';
+﻿import type { SessionActionDelays, SessionTimeoutConfig } from './models/session-timeout-config';
 
 export const DEFAULT_HTTP_ACTIVITY = Object.freeze({
   enabled: true,
@@ -11,6 +11,16 @@ export const DEFAULT_HTTP_ACTIVITY = Object.freeze({
   primaryTabOnly: true
 } as const);
 
+export const DEFAULT_ACTION_DELAYS = Object.freeze({
+  start: 0,
+  stop: 0,
+  resetIdle: 0,
+  extend: 0,
+  pause: 0,
+  resume: 0,
+  expire: 0
+} satisfies SessionActionDelays);
+
 export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   idleGraceMs: 120_000,
   countdownMs: 3_600_000,
@@ -22,6 +32,9 @@ export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   httpActivity: {
     ...DEFAULT_HTTP_ACTIVITY,
     strategy: 'allowlist'
+  },
+  actionDelays: {
+    ...DEFAULT_ACTION_DELAYS
   },
   openNewTabBehavior: 'inherit',
   routerCountsAsActivity: true,
@@ -47,19 +60,27 @@ export function mergeConfig(partial: Partial<SessionTimeoutConfig> | undefined):
     return { ...DEFAULT_SESSION_TIMEOUT_CONFIG };
   }
 
+  const { httpActivity, actionDelays, ...shallow } = partial;
+
   const mergedHttp = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity,
-    ...(partial.httpActivity ?? {})
+    ...(httpActivity ?? {})
+  };
+
+  const mergedDelays: SessionActionDelays = {
+    ...DEFAULT_SESSION_TIMEOUT_CONFIG.actionDelays,
+    ...(actionDelays ?? {})
   };
 
   const next: SessionTimeoutConfig = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG,
-    ...partial,
+    ...shallow,
     httpActivity: {
       ...mergedHttp,
       allowlist: mergedHttp.allowlist ?? [],
       denylist: mergedHttp.denylist ?? []
-    }
+    },
+    actionDelays: mergedDelays
   };
 
   return next;

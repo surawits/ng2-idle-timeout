@@ -40,17 +40,29 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
     issues.push(createIssue('onExpire', 'navigate: form requires target path')); // Fallback guard
   }
 
+  for (const [key, value] of Object.entries(config.actionDelays)) {
+    if (value < 0) {
+      issues.push(createIssue(`actionDelays.${key}`, 'Value must be >= 0'));
+    }
+  }
+
   return { issues, config };
 }
 
 function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): SessionTimeoutConfig {
   const base = { ...DEFAULT_SESSION_TIMEOUT_CONFIG };
+  const { httpActivity, actionDelays, ...shallow } = partial ?? {};
+
   const merged = {
     ...base,
-    ...(partial ?? {}),
+    ...shallow,
     httpActivity: {
       ...base.httpActivity,
-      ...(partial?.httpActivity ?? {})
+      ...(httpActivity ?? {})
+    },
+    actionDelays: {
+      ...base.actionDelays,
+      ...(actionDelays ?? {})
     }
   };
 

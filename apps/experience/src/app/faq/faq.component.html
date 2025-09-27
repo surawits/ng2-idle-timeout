@@ -1,0 +1,31 @@
+<section class="faq">
+  <header class="faq-header text-center">
+    <span class="badge text-bg-info rounded-pill">FAQs</span>
+    <h1>Answers to common integration questions</h1>
+    <p class="lead">
+      Troubleshooting session behaviour, usage patterns, and technical integration pitfalls for ng2-idle-timeout.
+    </p>
+  </header>
+
+  <div class="row g-4">
+    <div class="col-12 col-lg-4" *ngFor="let group of groups">
+      <div class="card h-100 shadow-sm">
+        <div class="card-body d-flex flex-column">
+          <div class="group-header">
+            <span class="badge rounded-pill" [ngClass]="group.badgeClass">{{ group.title }}</span>
+            <h2>{{ group.title }}</h2>
+          </div>
+          <div class="faq-list">
+            <div class="faq-item" *ngFor="let faq of group.faqs; let i = index" [attr.id]="slugify(group.title, i)">
+              <h3>{{ faq.question }}</h3>
+              <p>{{ faq.answer }}</p>
+            </div>
+          </div>
+          <div class="mt-auto pt-3">
+            <a class="link-primary small" href="#top">Back to top</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

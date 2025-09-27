@@ -1,13 +1,16 @@
+﻿import { EnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
+
+import type { ActivityEvent } from '../models/activity-event';
 import type { SessionSnapshot } from '../models/session-state';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
 import { TimeSourceService } from './time-source.service';
-import type { ActivityEvent } from '../models/activity-event';
 import { ActivityDomService } from './activity-dom.service';
 import { ActivityRouterService } from './activity-router.service';
+import { ServerTimeService } from './server-time.service';
 
 class MockTimeSourceService {
   private current = 0;
@@ -45,11 +48,33 @@ class StubActivityRouterService {
   }
 }
 
+class StubServerTimeService {
+  configure = jest.fn();
+  stop = jest.fn();
+  private listener: (() => void) | null = null;
+
+  registerSyncListener(listener: () => void): void {
+    this.listener = listener;
+  }
+
+  unregisterSyncListener(listener: () => void): void {
+    if (this.listener === listener) {
+      this.listener = null;
+    }
+  }
+
+  triggerSync(): void {
+    this.listener?.();
+  }
+}
+
 describe('SessionTimeoutService', () => {
+  let injector: EnvironmentInjector;
   let service: SessionTimeoutService;
   let time: MockTimeSourceService;
   let domService: StubActivityDomService;
   let routerService: StubActivityRouterService;
+  let serverTime: StubServerTimeService;
   const baseConfig: SessionTimeoutConfig = {
     idleGraceMs: 200,
     countdownMs: 1000,
@@ -68,6 +93,15 @@ describe('SessionTimeoutService', () => {
       onlyWhenTabFocused: false,
       primaryTabOnly: false
     },
+    actionDelays: {
+      start: 0,
+      stop: 0,
+      resetIdle: 0,
+      extend: 0,
+      pause: 0,
+      resume: 0,
+      expire: 0
+    },
     openNewTabBehavior: 'inherit',
     routerCountsAsActivity: true,
     debounceMouseMs: 800,
@@ -78,21 +112,27 @@ describe('SessionTimeoutService', () => {
     serverTimeEndpoint: undefined,
     logging: 'silent',
     ignoreUserActivityWhenPaused: false,
-    allowManualExtendWhenExpired: false
+    allowManualExtendWhenExpired: false,
+    resumeBehavior: 'manual'
   };
 
   beforeEach(() => {
     domService = new StubActivityDomService();
     routerService = new StubActivityRouterService();
+    serverTime = new StubServerTimeService();
+
     TestBed.configureTestingModule({
       providers: [
         SessionTimeoutService,
         { provide: TimeSourceService, useClass: MockTimeSourceService },
         { provide: SESSION_TIMEOUT_CONFIG, useValue: baseConfig },
         { provide: ActivityDomService, useValue: domService },
-        { provide: ActivityRouterService, useValue: routerService }
+        { provide: ActivityRouterService, useValue: routerService },
+        { provide: ServerTimeService, useValue: serverTime }
       ]
     });
+
+    injector = TestBed.inject(EnvironmentInjector);
     service = TestBed.inject(SessionTimeoutService);
     time = TestBed.inject(TimeSourceService) as unknown as MockTimeSourceService;
   });
@@ -156,6 +196,16 @@ describe('SessionTimeoutService', () => {
     expect(snapshot().state).toBe('COUNTDOWN');
   });
 
+  it('auto resumes when server sync occurs in autoOnServerSync mode', () => {
+    service.setConfig({ resumeBehavior: 'autoOnServerSync' });
+    service.pause();
+    expect(service.getSnapshot().paused).toBe(true);
+
+    serverTime.triggerSync();
+
+    expect(service.getSnapshot().paused).toBe(false);
+  });
+
   it('extend refreshes countdown end', () => {
     service.start();
     time.advance(baseConfig.idleGraceMs + 1);
@@ -168,6 +218,20 @@ describe('SessionTimeoutService', () => {
     service.extend();
     const afterExtend = snapshot().remainingMs;
     expect(afterExtend).toBeGreaterThan(beforeExtend);
+  });
+
+  it('resetIdle records HTTP activity metadata', () => {
+    const activities: ActivityEvent[] = [];
+    const events: Array<{ type: string; meta?: Record<string, unknown> }> = [];
+
+    service.activity$.subscribe(activity => activities.push(activity));
+    service.events$.subscribe(event => events.push({ type: event.type, meta: event.meta as Record<string, unknown> | undefined }));
+
+    service.resetIdle({ method: 'GET', url: '/api/ping' }, { source: 'http' });
+
+    expect(activities[0]?.source).toBe('http');
+    expect(events[0]?.type).toBe('ResetByActivity');
+    expect(events[0]?.meta).toMatchObject({ activitySource: 'http', method: 'GET', url: '/api/ping' });
   });
 
   it('resets idle on DOM activity events', () => {
@@ -211,6 +275,7 @@ describe('SessionTimeoutService', () => {
 
     const newDomService = new StubActivityDomService();
     const newRouterService = new StubActivityRouterService();
+    const newServerTime = new StubServerTimeService();
 
     TestBed.configureTestingModule({
       providers: [
@@ -225,7 +290,8 @@ describe('SessionTimeoutService', () => {
         },
         { provide: SESSION_TIMEOUT_CONFIG, useValue: baseConfig },
         { provide: ActivityDomService, useValue: newDomService },
-        { provide: ActivityRouterService, useValue: newRouterService }
+        { provide: ActivityRouterService, useValue: newRouterService },
+        { provide: ServerTimeService, useValue: newServerTime }
       ]
     });
 
@@ -238,3 +304,8 @@ describe('SessionTimeoutService', () => {
     }
   });
 });
+
+
+
+
+

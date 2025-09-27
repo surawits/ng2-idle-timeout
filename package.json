@@ -13,9 +13,12 @@
     "lint": "npm run lint --workspace=ng2-idle-timeout",
     "test": "npm run test --workspace=ng2-idle-timeout",
     "test:unit": "npm run test --workspace=ng2-idle-timeout",
-    "test:e2e": "npm run test:e2e --workspace=demo-app",
+    "test:e2e": "npm run demo:test",
     "format": "prettier --write \"**/*.{ts,js,json,md}\"",
-    "control:inspect": "node --experimental-strip-types scripts/control/inspect.ts"
+    "control:inspect": "node --experimental-strip-types scripts/control/inspect.ts",
+    "demo:start": "npm --prefix apps/experience run start",
+    "demo:build": "npm --prefix apps/experience run build",
+    "demo:test": "npm --prefix apps/experience run test"
   },
   "engines": {
     "node": ">=18.13.0",

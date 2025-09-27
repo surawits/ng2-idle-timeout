@@ -1,0 +1,52 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand d-flex align-items-center gap-2" routerLink="/" (click)="closeMenu()">
+      <i class="bi bi-lightning-charge-fill text-primary"></i>
+      <span class="brand-title">ng2-idle-timeout Experience</span>
+    </a>
+    <button
+      class="navbar-toggler"
+      type="button"
+      aria-controls="primaryNav"
+      [attr.aria-expanded]="isMenuOpen"
+      aria-label="Toggle navigation"
+      (click)="toggleMenu()"
+    >
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="primaryNav" [class.show]="isMenuOpen">
+      <ul class="navbar-nav ms-auto align-items-lg-center">
+        <li class="nav-item" *ngFor="let item of navItems">
+          <a
+            *ngIf="item.routerLink"
+            class="nav-link"
+            [routerLink]="item.routerLink"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="item.routerLink === '/' ? { exact: true } : { exact: false }"
+            (click)="closeMenu()"
+          >
+            {{ item.label }}
+          </a>
+          <a
+            *ngIf="item.externalUrl"
+            class="nav-link"
+            [href]="item.externalUrl"
+            [attr.target]="item.target"
+            [attr.rel]="item.target === '_blank' ? 'noopener noreferrer' : null"
+            (click)="closeMenu()"
+          >
+            {{ item.label }}
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="main">
+  <router-outlet />
+</main>
+
+<footer class="footer">
+  <span>MIT (c) ng2-idle-timeout contributors</span>
+</footer>

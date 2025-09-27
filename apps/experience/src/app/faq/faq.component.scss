@@ -1,0 +1,56 @@
+:host {
+  display: block;
+}
+
+.faq {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.faq-header {
+  display: grid;
+  gap: 1rem;
+}
+
+.faq-header h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 4vw, 3rem);
+}
+
+.faq-header .lead {
+  margin: 0 auto;
+  max-width: 48rem;
+  color: var(--text-color-secondary);
+}
+
+.group-header {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.group-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.faq-list {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.faq-item h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.faq-item p {
+  margin: 0;
+  color: var(--text-color-secondary);
+}
+
+@media (max-width: 992px) {
+  .faq-header .lead {
+    padding: 0 1rem;
+  }
+}

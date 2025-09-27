@@ -1,51 +1,108 @@
 ﻿# ng2-idle-timeout
 
-Production-ready, zoneless-friendly session timeout orchestration for Angular 16 through 20.
+> Zoneless-friendly session timeout orchestration for Angular 16-20.
 
-## Current sprint snapshot
-Sprint 5 adds server-time awareness and smarter resume controls:
-- ServerTimeService keeps client clocks aligned with retry/backoff and hands offsets to the time source.
-- `resumeBehavior: "autoOnServerSync"` can resume paused sessions after the next successful sync (overridable per route).
-- SessionExpiredGuard accepts route data overrides to tweak config, allow expired routes, or auto-resume when entering a view.
+`ng2-idle-timeout` keeps every tab of your Angular application in sync while tracking user activity, coordinating
+leader election, and handling server-aligned countdowns — all without relying on Angular zones.
 
-Sprint 4 extends the multi-tab work with HTTP awareness:
-- SessionActivityHttpInterceptor supports allowlist and header-flag strategies with cooldowns, tab-focus, and leader gating.
-- HTTP-triggered resets surface as `activitySource: "http"` so downstream listeners can coordinate with user actions.
-- Context tokens let you flag ad-hoc requests without mutating headers when the backend already knows about the session.
+## Features
+- Session engine built on signals (IDLE -> COUNTDOWN -> WARN -> EXPIRED) with persistence and structured events.
+- DOM, router, and HTTP activity detectors designed to be zone-safe.
+- Cross-tab coordination via BroadcastChannel fallback and a leader election service.
+- Optional server time offset service with retry/backoff and auto-resume behaviour.
+- Route-level overrides and pause/resume helpers for fine-grained UX.
+- Tooling package that includes an `ng add` schematic, docs/playground app, and CI workflow.
 
-Sprint 3 layers cross-tab awareness on top of the Sprint 1-2 groundwork:
-- BroadcastChannel sync (with localStorage fallback) keeps extend/expire decisions in lock-step across tabs.
-- LeaderElectionService heartbeats ensure one primary tab at a time and surface `LeaderElected` / `LeaderLost` session events.
-- New Jest coverage exercises cross-tab extend/expire flows and leadership failover so regressions are caught early.
+## Documentation & playground
+Run `npm run demo:start` to open the Angular 18 experience app (docs + live playground) at http://localhost:4200.
 
-Earlier sprints stay green:
-- Sprint 2 delivered DOM/router activity detectors plus persistence so new tabs inherit state without auto-extending.
-- Sprint 1 established the core finite-state machine, persistence, and logging utilities.
+- Navigate to **Docs** for installation, quick start, and recipes.
+- Switch to **Playground** to tweak idle durations, emit mock activity, and observe the live session snapshot.
 
-## Multi-tab recipe (Sprint 3)
-1. Provide `SESSION_TIMEOUT_CONFIG` with a shared `storageKeyPrefix` and optional `appInstanceId` for the product you want to coordinate across tabs.
-2. Inject `SessionTimeoutService` in each bootstrapped tab and call `start()` once global services are ready.
-3. Subscribe to `sessionTimeout.events$` and watch for `LeaderElected` / `LeaderLost` to gate primary-tab-only work (for example, HTTP activity syncing in later sprints).
-4. Listen to `sessionTimeout.crossTab$` if you need to react immediately when another tab extends or forces expiry.
-5. Each tab automatically falls back to localStorage sync when BroadcastChannel is not available, so SPA and legacy browsers stay in step.
+## Compatibility
+| Package | Angular | Node | RxJS |
+|---------|---------|------|------|
+| ng2-idle-timeout | 16-20 | >= 18.13 | >= 7.5 < 9 |
 
-## HTTP activity recipe (Sprint 4)
-1. Provide `SessionActivityHttpInterceptor` in your app module alongside `SESSION_TIMEOUT_CONFIG`.
-2. Configure `httpActivity` with either `strategy: "allowlist"` (regex-driven) or `strategy: "headerFlag"` (backend-marked) as fits your deployment.
-3. When using header flags, set `headerFlag` (defaults to `X-Session-Activity`) or set a boolean on `req.context` with `getSessionActivityContextToken(name)`.
-4. Tune `cooldownMs`, `ignoreOnInitMs`, `onlyWhenTabFocused`, and `primaryTabOnly` to avoid runaway activity when polling or running in background tabs.
-5. Subscribe to `sessionTimeout.events$` to observe `ResetByActivity` metadata for auditing or telemetry.
+## Installation
+```bash
+npm install ng2-idle-timeout
+```
+Or let the schematic handle the wiring:
+```bash
+ng add ng2-idle-timeout-ng-add
+```
+The schematic adds the dependency, scaffolds `session-timeout.providers.ts`, and spreads the providers into
+`app.config.ts` so the service is ready at bootstrap.
 
-## Pause/resume recipe (Sprint 5)
-1. Set `resumeBehavior: 'autoOnServerSync'` in `SESSION_TIMEOUT_CONFIG` (or via `sessionTimeout.setConfig`) to resume paused sessions after the next successful server-time sync.
-2. Use `SessionExpiredGuard` route data (`{ sessionTimeout: { config: { resumeBehavior: 'autoOnServerSync' }, allowWhenExpired, autoResume } }`) to tailor behavior per navigation.
-3. The session stays paused when using the default `'manual'` behavior—call `sessionTimeout.resume()` or provide route overrides when you want to unblock the flow.
+## Quick start
+```ts
+// session-timeout.providers.ts
+import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
 
-More documentation, recipes, and schematics will land in Sprint 6.
+export const sessionTimeoutProviders = [
+  SessionTimeoutService,
+  {
+    provide: SESSION_TIMEOUT_CONFIG,
+    useValue: {
+      storageKeyPrefix: 'app-session',
+      warnBeforeMs: 60_000,
+      resumeBehavior: 'autoOnServerSync'
+    }
+  }
+];
+```
+```ts
+// app.config.ts
+import { provideRouter } from '@angular/router';
+import { sessionTimeoutProviders } from './session-timeout.providers';
 
-## ng add schematic (Sprint 6)
-1. Run `ng add ng2-idle-timeout-ng-add` inside your Angular workspace.
-2. The schematic adds `ng2-idle-timeout` to `package.json`, scaffolds `session-timeout.providers.ts` (exporting `sessionTimeoutProviders`), and connects the providers to `app.config.ts`.
-3. Tweak the generated config as needed (for example, adjust `storageKeyPrefix`, `warnBeforeMs`, or `resumeBehavior`) before bootstrapping the app.
+export const appConfig = {
+  providers: [
+    provideRouter(routes),
+    ...sessionTimeoutProviders
+  ]
+};
+```
+Call `sessionTimeout.start()` once your shell-level services are ready so the initial snapshot is persisted.
 
+## Recipes
+### Multi-tab coordination
+1. Share `storageKeyPrefix` (and optionally `appInstanceId`) across tabs.
+2. Inject `SessionTimeoutService` in every bootstrap flow and call `start()` once global services initialise.
+3. Listen to `sessionTimeout.events$` for `LeaderElected`/`LeaderLost` to gate primary-tab work.
+4. Subscribe to `sessionTimeout.crossTab$` to react when other tabs extend or expire a session.
 
+### HTTP activity integration
+1. Provide `SessionActivityHttpInterceptor` alongside `SESSION_TIMEOUT_CONFIG`.
+2. Configure `httpActivity` with `strategy: 'allowlist'` or `strategy: 'headerFlag'`.
+3. Tune `cooldownMs`, `ignoreOnInitMs`, `onlyWhenTabFocused`, and `primaryTabOnly` to avoid noisy polling.
+4. Observe `sessionTimeout.events$` metadata to understand which requests reset the idle timer.
+
+### Pause & resume with server sync
+1. Set `resumeBehavior: 'autoOnServerSync'` globally or per route.
+2. Use `SessionExpiredGuard` data overrides to allow/deny routes when expired or to auto-resume on navigation.
+3. Manual `sessionTimeout.resume()` remains available when you prefer explicit control.
+
+## Scripts & testing
+| Command | Purpose |
+|---------|---------|
+| `npm run build --workspace=ng2-idle-timeout` | Build the library with ng-packagr. |
+| `npm run test --workspace=ng2-idle-timeout` | Run the Jest suite for services, guards, and interceptors. |
+| `npm run test --workspace=schematics/ng-add` | Execute schematic unit tests. |
+| `npm run demo:start` | Launch the Angular 18 documentation & playground app. |
+| `npm run demo:build` | Production build for the documentation & playground app. |
+| `npm run demo:test` | Ensure the demo compiles (development build). |
+
+Release highlights are tracked in [`RELEASE_NOTES.md`](./RELEASE_NOTES.md).
+
+## Contributing
+1. Fork the repository and create a feature branch.
+2. Run the relevant `npm run test --workspace=…` commands before opening a PR.
+3. Update README/RELEASE_NOTES when behaviour changes.
+4. Follow Conventional Commits (`feat:`, `fix:`, `chore:`, etc.).
+
+Bug reports and feature requests are welcome. Please include reproduction steps and environment details.
+
+## License
+MIT (c) the ng2-idle-timeout contributors.
