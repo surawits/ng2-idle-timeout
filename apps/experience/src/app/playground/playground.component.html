@@ -109,27 +109,77 @@
       </div>
 
       <div class="actions mt-4 d-flex flex-wrap gap-3">
-        <button type="button" class="btn btn-outline-secondary" (click)="pause()">
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="start()"
+          *ngIf="!isSessionActive()"
+        >
+          <i class="bi bi-power"></i>
+          Start service
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-danger"
+          (click)="stop()"
+          *ngIf="isSessionActive()"
+        >
+          <i class="bi bi-power"></i>
+          Stop service
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          (click)="pause()"
+          *ngIf="isSessionActive()"
+          [disabled]="isSessionPaused()"
+        >
           <i class="bi bi-pause-circle"></i>
           Pause
         </button>
-        <button type="button" class="btn btn-outline-secondary" (click)="resume()">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          (click)="resume()"
+          *ngIf="isSessionActive()"
+          [disabled]="!isSessionPaused()"
+        >
           <i class="bi bi-play-circle"></i>
           Resume
         </button>
-        <button type="button" class="btn btn-outline-primary" (click)="extend()">
+        <button
+          type="button"
+          class="btn btn-outline-primary"
+          (click)="extend()"
+          [disabled]="!isSessionActive()"
+        >
           <i class="bi bi-plus-circle"></i>
           Extend
         </button>
-        <button type="button" class="btn btn-light" (click)="resetIdle('dom')">
+        <button
+          type="button"
+          class="btn btn-light"
+          (click)="resetIdle('dom')"
+          [disabled]="!isSessionActive()"
+        >
           <i class="bi bi-display"></i>
           Simulate DOM activity
         </button>
-        <button type="button" class="btn btn-light" (click)="resetIdle('http')">
+        <button
+          type="button"
+          class="btn btn-light"
+          (click)="resetIdle('http')"
+          [disabled]="!isSessionActive()"
+        >
           <i class="bi bi-cloud-arrow-repeat"></i>
           Simulate HTTP activity
         </button>
-        <button type="button" class="btn btn-outline-success" (click)="triggerServerSync()">
+        <button
+          type="button"
+          class="btn btn-outline-success"
+          (click)="triggerServerSync()"
+          [disabled]="!isSessionActive()"
+        >
           <i class="bi bi-arrow-repeat"></i>
           Trigger server sync
         </button>
@@ -142,30 +192,45 @@
       <h3 class="card-title">Session telemetry</h3>
       <h6 class="card-subtitle mb-3 text-muted">Live insight into the timeout cycle</h6>
 
-      <div class="telemetry-metrics">
-        <div class="metric border rounded-3">
-          <span class="metric-label">Idle remaining</span>
-          <span class="metric-value">{{ idleRemainingSeconds() | number: '1.1-1' }} s</span>
+      <div class="telemetry-metrics d-flex flex-column gap-3">
+        <div class="metric-row d-flex flex-column flex-md-row gap-3">
+          <div class="metric border rounded-3 flex-fill">
+            <span class="metric-label">Activity cooldown</span>
+            <span class="metric-value">{{ activityCooldownRemainingSeconds() }} s</span>
+          </div>
+          <div class="metric border rounded-3 flex-fill">
+            <span class="metric-label">Idle remaining</span>
+            <span class="metric-value">{{ idleRemainingSeconds() }} s</span>
+          </div>
         </div>
-        <div class="metric border rounded-3">
-          <span class="metric-label">Countdown remaining</span>
-          <span class="metric-value">{{ countdownRemainingSeconds() | number: '1.1-1' }} s</span>
-        </div>
-        <div class="metric border rounded-3">
-          <span class="metric-label">Warning window</span>
-          <span class="metric-value">{{ warningWindowSeconds() | number: '1.0-0' }} s</span>
+        <div class="metric-row d-flex flex-column flex-md-row gap-3">
+          <div class="metric border rounded-3 flex-fill">
+            <span class="metric-label">Warning modal in</span>
+            <span class="metric-value">{{ warningModalCountdownSeconds() }} s</span>
+          </div>
+          <div class="metric border rounded-3 flex-fill">
+            <span class="metric-label">Countdown remaining</span>
+            <span class="metric-value">{{ countdownRemainingSeconds() }} s</span>
+          </div>
         </div>
       </div>
 
       <div class="telemetry-state">
         <span class="label">State</span>
-        <span class="badge" [attr.class]="'badge ' + sessionBadgeClass()">{{ sessionState() }}</span>
+        <span class="badge" [attr.class]="'badge ' + sessionBadgeClass()">{{ visibleSessionState() }}</span>
+      </div>
+
+      <div class="telemetry-target d-flex justify-content-between align-items-baseline gap-3 py-2 border-top pt-3">
+        <span class="label fw-semibold text-secondary">Warning starts</span>
+        <span class="value">
+          {{ warningModalTargetDate() ? (warningModalTargetDate() | date: 'dd MMMM yyyy HH:mm:ss') : '&mdash;' }}
+        </span>
       </div>
 
       <div class="telemetry-target d-flex justify-content-between align-items-baseline gap-3 py-2 mb-3 border-top pt-3">
         <span class="label fw-semibold text-secondary">Countdown ends</span>
         <span class="value">
-          {{ countdownTargetDate() ? (countdownTargetDate() | date: 'dd MMMM yyyy HH:mm:ss') : '—' }}
+          {{ countdownTargetDate() ? (countdownTargetDate() | date: 'dd MMMM yyyy HH:mm:ss') : '&mdash;' }}
         </span>
       </div>
 

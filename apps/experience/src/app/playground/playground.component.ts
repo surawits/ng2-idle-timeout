@@ -48,13 +48,23 @@ export class PlaygroundComponent {
   eventPage = 0;
   activityPage = 0;
 
+  private readonly serviceActive = signal(false);
+
   private readonly configState = signal(this.sessionTimeout.getConfig());
   private readonly renderNow = signal(Date.now());
   private renderTimerHandle: ReturnType<typeof setInterval> | null = null;
 
   readonly snapshot = computed(() => this.sessionTimeout.getSnapshot());
   readonly sessionState = computed(() => this.snapshot().state);
+  readonly isSessionActive = computed(() => this.serviceActive());
+  readonly isSessionPaused = computed(() => this.serviceActive() && this.snapshot().paused);
+  readonly isWarnState = computed(() => this.serviceActive() && this.sessionState() === 'WARN');
+  readonly visibleSessionState = computed(() => (this.isSessionActive() ? this.sessionState() : 'Stopped'));
+
   readonly sessionBadgeClass = computed(() => {
+    if (!this.isSessionActive()) {
+      return 'text-bg-secondary';
+    }
     const state = this.sessionState();
     if (state === 'EXPIRED') {
       return 'text-bg-danger';
@@ -64,42 +74,95 @@ export class PlaygroundComponent {
     }
     return 'text-bg-success';
   });
-  readonly isWarnState = computed(() => this.sessionState() === 'WARN');
 
   readonly idleRemainingSeconds = computed(() => {
+    if (!this.isSessionActive()) {
+      return 0;
+    }
     const snapshot = this.snapshot();
     const config = this.configState();
     if (snapshot.state !== 'IDLE' || snapshot.idleStartAt == null) {
       return 0;
     }
     const remainingMs = Math.max(0, snapshot.idleStartAt + config.idleGraceMs - this.renderNow());
-    return remainingMs / 1000;
+    return Math.ceil(remainingMs / 1000);
   });
 
   readonly countdownRemainingSeconds = computed(() => {
+    if (!this.isSessionActive()) {
+      return 0;
+    }
     const snapshot = this.snapshot();
     const config = this.configState();
     const target = snapshot.countdownEndAt;
     if (target == null) {
-      return snapshot.state === 'IDLE' ? config.countdownMs / 1000 : 0;
+      return snapshot.state === 'IDLE' ? Math.round(config.countdownMs / 1000) : 0;
     }
     const remainingMs = Math.max(0, target - this.renderNow());
-    return remainingMs / 1000;
+    return Math.ceil(remainingMs / 1000);
   });
 
-  readonly warningWindowSeconds = computed(() => this.configState().warnBeforeMs / 1000);
+  readonly activityCooldownRemainingSeconds = computed(() => {
+    const config = this.configState();
+    const baseSeconds = Math.max(0, Math.ceil(config.activityResetCooldownMs / 1000));
+    if (!this.isSessionActive()) {
+      return baseSeconds;
+    }
+    const lastActivityAt = this.snapshot().lastActivityAt;
+    if (lastActivityAt == null) {
+      return baseSeconds;
+    }
+    const remainingMs = lastActivityAt + config.activityResetCooldownMs - this.renderNow();
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  });
+
+  readonly warningModalCountdownSeconds = computed(() => {
+    if (!this.isSessionActive()) {
+      return 0;
+    }
+    const snapshot = this.snapshot();
+    const config = this.configState();
+    if (snapshot.state === 'WARN' || snapshot.state === 'EXPIRED') {
+      return 0;
+    }
+    if (snapshot.state === 'COUNTDOWN') {
+      const millisecondsUntilWarn = Math.max(0, snapshot.remainingMs - config.warnBeforeMs);
+      return Math.ceil(millisecondsUntilWarn / 1000);
+    }
+    return 0;
+  });
+
+  readonly warningModalTargetDate = computed(() => {
+    if (!this.isSessionActive()) {
+      return null;
+    }
+    const countdownEndAt = this.snapshot().countdownEndAt;
+    if (countdownEndAt == null) {
+      return null;
+    }
+    return new Date(countdownEndAt - this.configState().warnBeforeMs);
+  });
 
   readonly countdownTargetDate = computed(() => {
+    if (!this.isSessionActive()) {
+      return null;
+    }
     const target = this.snapshot().countdownEndAt;
     return target ? new Date(target) : null;
   });
 
   constructor() {
-    this.sessionTimeout.start();
     this.applyConfig();
     this.startRenderTicker();
+    this.sessionTimeout.stop();
 
     const eventsSub = this.sessionTimeout.events$.subscribe(event => {
+      if (!this.serviceActive()) {
+        if (event.type !== 'Stopped') {
+          this.sessionTimeout.stop();
+        }
+        return;
+      }
       const metaSummary = this.summariseMeta(event.meta);
       const view: EventView = {
         type: event.type,
@@ -114,6 +177,9 @@ export class PlaygroundComponent {
     });
 
     const activitySub = this.sessionTimeout.activity$.subscribe(activity => {
+      if (!this.serviceActive()) {
+        return;
+      }
       const view = this.formatActivity(activity);
       this.activityLog = [view, ...this.activityLog].slice(0, 50);
       this.activityPage = 0;
@@ -135,25 +201,63 @@ export class PlaygroundComponent {
       resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual'
     });
     this.configState.set(this.sessionTimeout.getConfig());
+    if (!this.serviceActive()) {
+      this.sessionTimeout.stop();
+    }
+  }
+
+  start(): void {
+    if (this.serviceActive()) {
+      return;
+    }
+    this.serviceActive.set(true);
+    this.events = [];
+    this.activityLog = [];
+    this.eventPage = 0;
+    this.activityPage = 0;
+    this.sessionTimeout.start();
+  }
+
+  stop(): void {
+    if (!this.serviceActive()) {
+      return;
+    }
+    this.serviceActive.set(false);
+    this.sessionTimeout.stop();
   }
 
   pause(): void {
+    if (!this.serviceActive() || this.isSessionPaused()) {
+      return;
+    }
     this.sessionTimeout.pause();
   }
 
   resume(): void {
+    if (!this.serviceActive() || !this.isSessionPaused()) {
+      return;
+    }
     this.sessionTimeout.resume();
   }
 
   extend(): void {
+    if (!this.serviceActive()) {
+      return;
+    }
     this.sessionTimeout.extend({ source: 'playground' });
   }
 
   resetIdle(source: 'dom' | 'http' | 'manual'): void {
+    if (!this.serviceActive()) {
+      return;
+    }
     this.sessionTimeout.resetIdle({ source }, { source });
   }
 
   triggerServerSync(): void {
+    if (!this.serviceActive()) {
+      return;
+    }
     const handler = (this.sessionTimeout as unknown as { handleServerSync?: () => void }).handleServerSync;
     handler?.call(this.sessionTimeout);
   }
