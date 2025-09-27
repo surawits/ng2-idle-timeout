@@ -33,6 +33,7 @@ export const sessionTimeoutProviders = [
     useValue: {
       storageKeyPrefix: 'app-session',
       warnBeforeMs: 60000,
+      activityResetCooldownMs: 5000,
       resumeBehavior: 'autoOnServerSync'
     }
   }

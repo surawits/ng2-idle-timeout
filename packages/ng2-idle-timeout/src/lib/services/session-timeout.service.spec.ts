@@ -80,6 +80,7 @@ describe('SessionTimeoutService', () => {
     countdownMs: 1000,
     warnBeforeMs: 300,
     pollingMs: 50,
+    activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
     strategy: 'userOnly',
@@ -257,6 +258,38 @@ describe('SessionTimeoutService', () => {
     const after = snapshot();
     expect(after.idleStartAt).toBe(before.idleStartAt);
     expect(after.remainingMs).toBe(before.remainingMs);
+  });
+
+  it('throttles DOM activity resets using activityResetCooldownMs', () => {
+    service.setConfig({ activityResetCooldownMs: 5000 });
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    expect(snapshot().state).toBe('COUNTDOWN');
+
+    domService.emit({ type: 'click' });
+
+    const firstActivityCandidate = snapshot().lastActivityAt;
+    expect(firstActivityCandidate).not.toBeNull();
+    if (firstActivityCandidate == null) {
+      throw new Error('Expected lastActivityAt after DOM activity');
+    }
+    const firstActivity = firstActivityCandidate;
+
+    time.advance(1000);
+    domService.emit({ type: 'mousemove' });
+
+    expect(snapshot().lastActivityAt).toBe(firstActivity);
+
+    time.advance(5000);
+    domService.emit({ type: 'scroll' });
+
+    const thirdActivityCandidate = snapshot().lastActivityAt;
+    expect(thirdActivityCandidate).not.toBeNull();
+    if (thirdActivityCandidate == null) {
+      throw new Error('Expected lastActivityAt after cooldown elapsed');
+    }
+    expect(thirdActivityCandidate).toBeGreaterThan(firstActivity);
   });
 
   it('restores persisted countdown state across instances', () => {

@@ -35,6 +35,7 @@ export class PlaygroundComponent {
   idleGraceSeconds = 60;
   countdownSeconds = 300;
   warnBeforeSeconds = 60;
+  activityCooldownSeconds = 5;
   autoResume = true;
 
   readonly heroBadges = ['Real-time events', 'Cross-tab ready', 'Server sync'];
@@ -130,6 +131,7 @@ export class PlaygroundComponent {
       idleGraceMs: this.idleGraceSeconds * 1000,
       countdownMs: this.countdownSeconds * 1000,
       warnBeforeMs: this.warnBeforeSeconds * 1000,
+      activityResetCooldownMs: this.activityCooldownSeconds * 1000,
       resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual'
     });
     this.configState.set(this.sessionTimeout.getConfig());

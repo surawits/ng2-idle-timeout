@@ -1,4 +1,4 @@
-﻿import type { ActivityEvent } from './activity-event';
+import type { ActivityEvent } from './activity-event';
 
 export type SessionTimeoutStrategy = 'userOnly' | 'userAndHttpAllowlist' | 'aggressive';
 
@@ -30,6 +30,7 @@ export interface SessionTimeoutConfig {
   countdownMs: number;
   warnBeforeMs: number;
   pollingMs: number;
+  activityResetCooldownMs: number;
   storageKeyPrefix: string;
   appInstanceId?: string;
   strategy: SessionTimeoutStrategy;

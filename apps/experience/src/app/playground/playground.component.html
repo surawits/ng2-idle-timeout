@@ -79,6 +79,20 @@
             [max]="countdownSeconds"
           />
         </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="cooldown">Activity cooldown (seconds)</label>
+          <input
+            id="cooldown"
+            type="number"
+            class="form-control"
+            [(ngModel)]="activityCooldownSeconds"
+            (ngModelChange)="applyConfig()"
+            step="1"
+            min="0"
+            max="600"
+          />
+          <small class="text-muted d-block mt-1">Minimum gap between DOM/router activity resets.</small>
+        </div>
         <div class="col-12 col-md-6 d-flex align-items-end">
           <div class="form-check form-switch w-100">
             <input

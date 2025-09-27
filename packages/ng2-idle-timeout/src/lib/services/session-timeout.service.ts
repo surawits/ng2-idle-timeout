@@ -104,6 +104,7 @@ export class SessionTimeoutService {
   private readonly tabId = generateTabId();
   private isHandlingCrossTabMessage = false;
   private readonly actionDelayTimers = new Map<ActionDelayKey, ReturnType<typeof setTimeout>>();
+  private lastAutoActivityResetAt: number | null = null;
   private readonly handleServerSync = () => {
     if (this.configSignal().resumeBehavior === 'autoOnServerSync' && this.snapshotSignal().paused) {
       this.zone.run(() => this.resume());
@@ -317,6 +318,8 @@ export class SessionTimeoutService {
       }
     });
     this.configSignal.set(config);
+
+    this.lastAutoActivityResetAt = null;
     if (issues.length > 0) {
       issues.forEach(issue => this.logger.warn('Invalid config field: ' + issue.field + ' - ' + issue.message));
     }
@@ -417,6 +420,15 @@ export class SessionTimeoutService {
   }
 
   private handleExternalActivity(activity: ActivityEvent, eventType: SessionEvent['type']): void {
+    const config = this.configSignal();
+    const now = this.timeSource.now();
+    if (config.activityResetCooldownMs > 0) {
+      const lastAcceptedAt = this.lastAutoActivityResetAt;
+      if (lastAcceptedAt != null && now - lastAcceptedAt < config.activityResetCooldownMs) {
+        return;
+      }
+    }
+
     const meta = {
       ...(activity.meta ?? {}),
       activitySource: activity.source,
@@ -424,9 +436,10 @@ export class SessionTimeoutService {
     };
     this.emitActivity(activity.source, activity.meta);
     const snapshot = this.snapshotSignal();
-    if (snapshot.paused && this.configSignal().ignoreUserActivityWhenPaused) {
+    if (snapshot.paused && config.ignoreUserActivityWhenPaused) {
       return;
     }
+    this.lastAutoActivityResetAt = now;
     this.executeWithDelay('resetIdle', () => {
       this.resetIdleInternal(eventType, meta);
     });
@@ -615,6 +628,7 @@ export class SessionTimeoutService {
       }
       this.isRestoring = true;
       this.configSignal.set(config);
+      this.lastAutoActivityResetAt = null;
       this.isRestoring = false;
     }
 

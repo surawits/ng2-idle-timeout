@@ -1,4 +1,4 @@
-﻿import type { SessionActionDelays, SessionTimeoutConfig } from './models/session-timeout-config';
+import type { SessionActionDelays, SessionTimeoutConfig } from './models/session-timeout-config';
 
 export const DEFAULT_HTTP_ACTIVITY = Object.freeze({
   enabled: true,
@@ -26,6 +26,7 @@ export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   countdownMs: 3_600_000,
   warnBeforeMs: 300_000,
   pollingMs: 500,
+  activityResetCooldownMs: 0,
   storageKeyPrefix: 'ng2-idle-timeout',
   appInstanceId: undefined,
   strategy: 'userOnly',

@@ -8,6 +8,7 @@ leader election, and handling server-aligned countdowns — all without relying 
 ## Features
 - Session engine built on signals (IDLE -> COUNTDOWN -> WARN -> EXPIRED) with persistence and structured events.
 - DOM, router, and HTTP activity detectors designed to be zone-safe.
+- Configurable activity cooldown to smooth out rapid DOM/router noise.
 - Cross-tab coordination via BroadcastChannel fallback and a leader election service.
 - Optional server time offset service with retry/backoff and auto-resume behaviour.
 - Route-level overrides and pause/resume helpers for fine-grained UX.
@@ -78,6 +79,10 @@ Call `sessionTimeout.start()` once your shell-level services are ready so the in
 2. Configure `httpActivity` with `strategy: 'allowlist'` or `strategy: 'headerFlag'`.
 3. Tune `cooldownMs`, `ignoreOnInitMs`, `onlyWhenTabFocused`, and `primaryTabOnly` to avoid noisy polling.
 4. Observe `sessionTimeout.events$` metadata to understand which requests reset the idle timer.
+
+### Activity throttling
+1. Set `activityResetCooldownMs` to enforce a minimum gap between DOM/router-driven idle resets.
+2. Combine with `debounceMouseMs`/`debounceKeyMs` when you need per-input smoothing.
 
 ### Pause & resume with server sync
 1. Set `resumeBehavior: 'autoOnServerSync'` globally or per route.

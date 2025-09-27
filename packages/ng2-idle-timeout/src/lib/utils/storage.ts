@@ -1,4 +1,4 @@
-﻿import { inject } from '@angular/core';
+import { inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 
 import type { SessionSnapshot, SessionState } from '../models/session-state';
@@ -32,6 +32,7 @@ interface SerializedConfig {
   countdownMs: number;
   warnBeforeMs: number;
   pollingMs: number;
+  activityResetCooldownMs?: number;
   storageKeyPrefix: string;
   strategy: SessionTimeoutConfig['strategy'];
   httpActivity: SerializedHttpConfig;
@@ -165,6 +166,7 @@ function serializeConfig(config: SessionTimeoutConfig): SerializedConfig {
     countdownMs: config.countdownMs,
     warnBeforeMs: config.warnBeforeMs,
     pollingMs: config.pollingMs,
+    activityResetCooldownMs: config.activityResetCooldownMs,
     storageKeyPrefix: config.storageKeyPrefix,
     strategy: config.strategy,
     httpActivity: serializeHttpConfig(config.httpActivity),
@@ -213,6 +215,7 @@ function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
     countdownMs: serialized.countdownMs,
     warnBeforeMs: serialized.warnBeforeMs,
     pollingMs: serialized.pollingMs,
+    activityResetCooldownMs: serialized.activityResetCooldownMs ?? DEFAULT_SESSION_TIMEOUT_CONFIG.activityResetCooldownMs,
     storageKeyPrefix: serialized.storageKeyPrefix,
     appInstanceId: undefined,
     strategy: serialized.strategy,

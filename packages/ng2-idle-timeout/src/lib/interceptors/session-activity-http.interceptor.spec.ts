@@ -24,6 +24,7 @@ describe('SessionActivityHttpInterceptor', () => {
     countdownMs: 1000,
     warnBeforeMs: 300,
     pollingMs: 50,
+    activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
     strategy: 'userAndHttpAllowlist',

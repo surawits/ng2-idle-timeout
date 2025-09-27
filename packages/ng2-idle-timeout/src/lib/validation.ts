@@ -27,6 +27,9 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
   if (config.pollingMs <= 0) {
     issues.push(createIssue('pollingMs', 'Value must be greater than 0'));
   }
+  if (config.activityResetCooldownMs < 0) {
+    issues.push(createIssue('activityResetCooldownMs', 'Value must be >= 0'));
+  }
   if (!config.storageKeyPrefix.trim()) {
     issues.push(createIssue('storageKeyPrefix', 'Prefix cannot be empty'));
   }

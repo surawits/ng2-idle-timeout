@@ -1,4 +1,4 @@
-﻿import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
 import type { SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
 
 const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
@@ -7,6 +7,7 @@ const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
   countdownMs: 15000,
   warnBeforeMs: 5000,
   resumeBehavior: 'autoOnServerSync',
+  activityResetCooldownMs: 5000,
   httpActivity: {
     enabled: true,
     strategy: 'allowlist',
