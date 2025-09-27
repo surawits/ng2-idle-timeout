@@ -1,113 +1,209 @@
-﻿# ng2-idle-timeout
+# ng2-idle-timeout
 
 > Zoneless-friendly session timeout orchestration for Angular 16-20.
 
 `ng2-idle-timeout` keeps every tab of your Angular application in sync while tracking user activity, coordinating
-leader election, and handling server-aligned countdowns — all without relying on Angular zones.
+leader election, and handling server-aligned countdowns - all without relying on Angular zones.
 
-## Features
-- Session engine built on signals (IDLE -> COUNTDOWN -> WARN -> EXPIRED) with persistence and structured events.
-- DOM, router, and HTTP activity detectors designed to be zone-safe.
-- Configurable activity cooldown to smooth out rapid DOM/router noise.
-- Cross-tab coordination via BroadcastChannel fallback and a leader election service.
-- Optional server time offset service with retry/backoff and auto-resume behaviour.
-- Route-level overrides and pause/resume helpers for fine-grained UX.
-- Tooling package that includes an `ng add` schematic, docs/playground app, and CI workflow.
+---
 
-## Documentation & playground
-Run `npm run demo:start` to open the Angular 18 experience app (docs + live playground) at http://localhost:4200.
+## 1. Overview & Concepts
 
-- Navigate to **Docs** for installation, quick start, and recipes.
-- Switch to **Playground** to tweak idle durations, emit mock activity, and observe the live session snapshot.
+**What it solves**
+- Consolidates idle detection, countdown warnings, and expiry flows across tabs and windows.
+- Survives page reloads by persisting snapshots and configuration to storage providers.
+- Plays nicely with zoneless Angular (signals everywhere) and progressive hydration.
 
-## Compatibility
-| Package | Angular | Node | RxJS |
-|---------|---------|------|------|
-| ng2-idle-timeout | 16-20 | >= 18.13 | >= 7.5 < 9 |
-
-## Installation
-```bash
-npm install ng2-idle-timeout
+**How it fits together**
 ```
-Or let the schematic handle the wiring:
-```bash
-ng add ng2-idle-timeout-ng-add
++--------------+    activity$     +--------------------+
+| Activity DOM | ----------------> |                    |
++--------------+                  |                    |
+| Activity     |    router$       |  SessionTimeout    |   snapshot()   +--------------+
+| Router       | ----------------> |    Service         | --------------> | UI / Guards  |
++--------------+                  |                    |                +--------------+
+| Activity HTTP|    http$         |                    |
++--------------+                  |                    | events$ / FX
+                                   +--------------------+
+                                                  |
+                                  BroadcastChannel | storage
+                                        cross-tab  | persistence
 ```
-The schematic adds the dependency, scaffolds `session-timeout.providers.ts`, and spreads the providers into
-`app.config.ts` so the service is ready at bootstrap.
 
-## Quick start
-```ts
-// session-timeout.providers.ts
-import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+**Compatible stacks**
+| Package            | Angular | Node  | RxJS         |
+|--------------------|---------|-------|--------------|
+| `ng2-idle-timeout` | 16-20   | >=18.13 | >=7.5 < 9 |
 
-export const sessionTimeoutProviders = [
-  SessionTimeoutService,
-  {
-    provide: SESSION_TIMEOUT_CONFIG,
-    useValue: {
-      storageKeyPrefix: 'app-session',
-      warnBeforeMs: 60_000,
-      resumeBehavior: 'autoOnServerSync'
-    }
-  }
-];
+---
+
+## 2. Quick Start
+
+1. **Install**
+   ```bash
+   npm install ng2-idle-timeout
+   ```
+   or scaffold everything:
+   ```bash
+   ng add ng2-idle-timeout-ng-add
+   ```
+
+2. **Provide configuration**
+   ```ts
+   // session-timeout.providers.ts
+   import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+
+   export const sessionTimeoutProviders = [
+     SessionTimeoutService,
+     {
+       provide: SESSION_TIMEOUT_CONFIG,
+       useValue: {
+         storageKeyPrefix: 'app-session',
+         idleGraceMs: 60_000,
+         countdownMs: 300_000,
+         warnBeforeMs: 60_000,
+         resumeBehavior: 'autoOnServerSync'
+       }
+     }
+   ];
+   ```
+   ```ts
+   // app.config.ts
+   import { provideRouter } from '@angular/router';
+   import { sessionTimeoutProviders } from './session-timeout.providers';
+
+   export const appConfig = {
+     providers: [provideRouter(routes), ...sessionTimeoutProviders]
+   };
+   ```
+
+3. **Start the engine** once shell services are ready:
+   ```ts
+   sessionTimeout.start();
+   ```
+
+4. **Verify** with the experience app:
+   ```bash
+   npm run demo:start
+   # docs at http://localhost:4200 (playground under /playground)
+   ```
+
+---
+
+## 3. Configuration Reference
+
+| Key                         | Default  | Description |
+|----------------------------|----------|-------------|
+| `idleGraceMs`              | `60000`  | How long a session can stay idle before countdown begins. |
+| `countdownMs`              | `300000` | Time window for user response before expiry. |
+| `warnBeforeMs`             | `60000`  | Threshold inside the countdown when WARN state fires. |
+| `activityResetCooldownMs`  | `5000`   | Minimum gap between auto resets triggered by DOM/router. |
+| `resumeBehavior`           | `'manual'` | `'manual'` or `'autoOnServerSync'` for post-expiry recovery. |
+| `storageKeyPrefix`         | `'session'` | Namespacing for persisted config and snapshots. |
+| `httpActivity.strategy`    | `'none'` | HTTP auto reset mode (`allowlist`, `headerFlag`, `none`). |
+| `actionDelays.start`       | `0`      | Debounce for throttling start/stop/pause/resume actions. |
+| `logLevel`                 | `'warn'` | Emits verbose diagnostics when set to `'debug'`. |
+
+**Timing cheat sheet**
 ```
-```ts
-// app.config.ts
-import { provideRouter } from '@angular/router';
-import { sessionTimeoutProviders } from './session-timeout.providers';
-
-export const appConfig = {
-  providers: [
-    provideRouter(routes),
-    ...sessionTimeoutProviders
-  ]
-};
+Idle            Countdown            Warn              Expired
+|<--60s-->||<-------------300s------------->|<--60s-->|
+           ^ idleGraceMs                   ^ warnBeforeMs
+           |<---- activity cooldown ---->|
 ```
-Call `sessionTimeout.start()` once your shell-level services are ready so the initial snapshot is persisted.
 
-## Recipes
-### Multi-tab coordination
-1. Share `storageKeyPrefix` (and optionally `appInstanceId`) across tabs.
-2. Inject `SessionTimeoutService` in every bootstrap flow and call `start()` once global services initialise.
-3. Listen to `sessionTimeout.events$` for `LeaderElected`/`LeaderLost` to gate primary-tab work.
-4. Subscribe to `sessionTimeout.crossTab$` to react when other tabs extend or expire a session.
+Example presets:
+- **Call centre** - long idle (10 min), short warn (30 s), manual resume.
+- **Banking** - short idle (2 min), aggressive warn (15 s), server sync required.
+- **Kiosk** - idle disabled, countdown only, auto resume when POS heartbeat returns.
 
-### HTTP activity integration
-1. Provide `SessionActivityHttpInterceptor` alongside `SESSION_TIMEOUT_CONFIG`.
-2. Configure `httpActivity` with `strategy: 'allowlist'` or `strategy: 'headerFlag'`.
-3. Tune `cooldownMs`, `ignoreOnInitMs`, `onlyWhenTabFocused`, and `primaryTabOnly` to avoid noisy polling.
-4. Observe `sessionTimeout.events$` metadata to understand which requests reset the idle timer.
+---
 
-### Activity throttling
-1. Set `activityResetCooldownMs` to enforce a minimum gap between DOM/router-driven idle resets.
-2. Combine with `debounceMouseMs`/`debounceKeyMs` when you need per-input smoothing.
+## 4. Lifecycle & Events
 
-### Pause & resume with server sync
-1. Set `resumeBehavior: 'autoOnServerSync'` globally or per route.
-2. Use `SessionExpiredGuard` data overrides to allow/deny routes when expired or to auto-resume on navigation.
-3. Manual `sessionTimeout.resume()` remains available when you prefer explicit control.
+**States**: `IDLE -> COUNTDOWN -> WARN -> EXPIRED`, with `PAUSED` overlay.
 
-## Scripts & testing
+| Event Type           | When it fires                               | Metadata highlights |
+|----------------------|----------------------------------------------|---------------------|
+| `Started`            | Engine initialised or restarted              | Snapshot at start.  |
+| `Extended`           | Countdown extended manually or automatically | Remaining ms, source. |
+| `Warn`               | Entered WARN threshold                       | Current tab leader. |
+| `Expired`            | Countdown reached zero                       | Whether callbacks resolved. |
+| `Paused` / `Resumed` | Manual controls or server-sync auto resume   | Previous state. |
+| `LeaderElected`      | Cross-tab election result                    | Leader tab id. |
+
+Use `sessionTimeout.events$` for a log, `activity$` to understand reset sources, and `getSnapshot()`/signals (`stateSignal`, `remainingMsSignal`) to bind UI.
+
+---
+
+## 5. UI Integration Recipes
+
+- **Modal warning + banner** - show a modal in WARN while keeping a slim banner/countdown visible; supply snippets for Angular Material, ng-zorro, and Bootstrap.
+- **Blocking expiry screen** - redirect to an "expired" route using `SessionExpiredGuard` with custom copy/actions.
+- **Toast or notification** - pipe `events$` through a store to push toast notifications on `Warn`, `LeaderLost`, or `Extended` events.
+- **Analytics hook** - forward `events$` into observability tooling to track idle vs engaged time.
+
+Each recipe in docs includes copy/paste snippets, styling tokens, and suggested UX copy.
+
+---
+
+## 6. Advanced Topics
+
+- **Cross-tab coordination** - enable broadcast channels, customise storage, and respond to leader election callbacks.
+- **Server time alignment** - inject `ServerTimeService`, configure jitter/backoff, and allow `autoOnServerSync` to revive WARN sessions.
+- **Custom activity sources** - extend the activity interface to plug in domain-specific signals (websocket heartbeats, service worker messages).
+- **Action delays and throttling** - use `actionDelays` to smooth aggressive UI controls or high-frequency automation.
+
+---
+
+## 7. Testing & Troubleshooting
+
+**Testing helpers**
+- Fake time source (`TimeSourceService` override) to deterministically advance timers.
+- Ephemeral storage adapters to isolate state between tests.
+- Marble tests for `events$` and `activity$` streams.
+
+**Troubleshooting checklist**
+- Inspect `sessionTimeout.getSnapshot()` in DevTools to confirm state transitions.
+- Enable `logLevel: 'debug'` to print lifecycle events and cross-tab messages.
+- Watch for clock drift if `ServerTimeService` is disabled but your backend enforces strict TTL.
+- Ensure primary tab election is stable inside private browsing (BroadcastChannel limitations).
+
+Common issues and remedies are captured in the FAQ on the docs site.
+
+---
+
+## 8. Migration & Versioning
+
+- Release notes live in [`RELEASE_NOTES.md`](./RELEASE_NOTES.md).
+- Follow the compatibility matrix above when upgrading Angular.
+- Major releases ship schematics to migrate providers and config names (for example, `idleMs` -> `idleGraceMs`).
+- Changelogs highlight breaking changes and opt-in feature flags.
+
+---
+
+## 9. Community & Support
+
+| Resource    | Purpose |
+|-------------|---------|
+| Issues      | Report bugs, request features (include repro + environment). |
+| Discussions | Share patterns, ask design questions. |
+| Roadmap     | `.github/ISSUE_TEMPLATE/roadmap.md` outlines upcoming milestones. |
+| Releases    | GitHub releases with tagged packages and playground deploys. |
+
+**Contribution guide**
+1. Fork and create a feature branch.
+2. Run `npm run build --workspace=ng2-idle-timeout` and relevant tests before a PR.
+3. Follow Conventional Commits (`feat:`, `fix:`, `chore:` ...).
+4. Update docs/examples when behaviour changes.
+
+**Maintainer scripts**
 | Command | Purpose |
 |---------|---------|
 | `npm run build --workspace=ng2-idle-timeout` | Build the library with ng-packagr. |
-| `npm run test --workspace=ng2-idle-timeout` | Run the Jest suite for services, guards, and interceptors. |
-| `npm run test --workspace=schematics/ng-add` | Execute schematic unit tests. |
-| `npm run demo:start` | Launch the Angular 18 documentation & playground app. |
-| `npm run demo:build` | Production build for the documentation & playground app. |
-| `npm run demo:test` | Ensure the demo compiles (development build). |
+| `npm run test --workspace=ng2-idle-timeout`  | Jest suite for services, guards, interceptors. |
+| `npm run demo:start`                         | Launch docs + playground locally. |
+| `npm run demo:build`                         | Production build of the experience app. |
+| `npm run demo:test`                          | Basic sanity check for the demo build. |
 
-Release highlights are tracked in [`RELEASE_NOTES.md`](./RELEASE_NOTES.md).
-
-## Contributing
-1. Fork the repository and create a feature branch.
-2. Run the relevant `npm run test --workspace=…` commands before opening a PR.
-3. Update README/RELEASE_NOTES when behaviour changes.
-4. Follow Conventional Commits (`feat:`, `fix:`, `chore:`, etc.).
-
-Bug reports and feature requests are welcome. Please include reproduction steps and environment details.
-
-## License
-MIT (c) the ng2-idle-timeout contributors.
+MIT licensed - happy idling!
