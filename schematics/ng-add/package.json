@@ -1,5 +1,5 @@
 {
-  "name": "ng2-idle-timeout-ng-add",
+  "name": "@ng2-idle-timeout/schematics",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 describe('ng-add schematic', () => {
   const collectionPath = join(__dirname, '../collection.json');
-  const runner = new SchematicTestRunner('ng2-idle-timeout-ng-add', collectionPath);
+  const runner = new SchematicTestRunner('@ng2-idle-timeout/schematics', collectionPath);
 
   const basePackageJson = {
     name: 'workspace',

@@ -6,6 +6,7 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "schematics": "./schematics/collection.json",
   "keywords": [
     "angular",
     "idle-timeout",
