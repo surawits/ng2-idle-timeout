@@ -1,0 +1,9 @@
+{
+  "": "http://json-schema.org/schema",
+  "schematics": {
+    "ng-add": {
+      "description": "Set up ng2-idle-timeout in the host project.",
+      "factory": "./src/index#ngAdd"
+    }
+  }
+}

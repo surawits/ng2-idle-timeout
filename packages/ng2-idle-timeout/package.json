@@ -5,13 +5,6 @@
   "author": "",
   "license": "MIT",
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/ng2-idle-timeout.d.ts",
-      "default": "./dist/ng2-idle-timeout.mjs"
-    },
-    "./package.json": "./package.json"
-  },
   "sideEffects": false,
   "keywords": [
     "angular",

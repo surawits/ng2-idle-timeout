@@ -1,0 +1,33 @@
+﻿name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Lint library
+        run: npm run lint --workspace=ng2-idle-timeout
+      - name: Build library package
+        run: npm run build --workspace=ng2-idle-timeout
+      - name: Run library tests
+        run: npm run test --workspace=ng2-idle-timeout
+      - name: Run schematic tests
+        run: npm run test --workspace=schematics/ng-add
+      - name: Run demo smoke tests
+        run: npm run test --workspace=demo-app

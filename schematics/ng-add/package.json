@@ -1,0 +1,21 @@
+{
+  "name": "ng2-idle-timeout-ng-add",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "schematics": "./collection.json",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@angular-devkit/core": "17.3.0",
+    "@angular-devkit/schematics": "17.3.0",
+    "@schematics/angular": "17.3.0"
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.12",
+    "jest": "29.7.0",
+    "ts-jest": "29.1.1",
+    "typescript": "5.4.5"
+  }
+}
