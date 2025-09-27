@@ -1,14 +1,15 @@
 <section class="page-hero">
   <div class="hero-copy">
-    <p class="eyebrow">Documentation</p>
-    <h1>Design session-aware Angular UX with confidence.</h1>
+    <p class="eyebrow">{{ craftedByLabel }}</p>
+    <h1>ng2-idle-timeout Reference</h1>
     <p class="lead">
-      Use ng2-idle-timeout to standardise idle detection, cross-tab coordination, and compliance-friendly timeout flows.
-      These docs walk through the moving parts while the playground lets you experiment with real service events.
+      These docs combine architectural guidance with hands-on recipes so your Angular app can orchestrate idle,
+      countdown, and expiry transitions across every tab. Explore the playground in parallel to validate scenarios
+      end-to-end.
     </p>
     <div class="hero-actions">
-      <a class="btn btn-primary rounded-pill" href="#install">Install</a>
-      <a class="btn btn-outline-primary rounded-pill" routerLink="/playground">Open Playground</a>
+      <a class="btn btn-primary rounded-pill" href="#quick-start">Get started</a>
+      <a class="btn btn-outline-primary rounded-pill" routerLink="/playground">Open playground</a>
     </div>
     <div class="badge-strip">
       <span *ngFor="let badge of heroBadges" class="badge bg-light text-dark border">{{ badge }}</span>
@@ -16,11 +17,11 @@
   </div>
   <div class="hero-card card shadow-sm">
     <div class="card-body">
-      <h5 class="card-title">What you'll find</h5>
+      <h5 class="card-title">What you'll cover</h5>
       <ul class="list-unstyled">
-        <li><i class="bi bi-check-circle-fill text-success"></i> Install schematics, providers, and configuration patterns.</li>
-        <li><i class="bi bi-check-circle-fill text-success"></i> Recipes for multi-tab sync, HTTP interceptors, and pausing flow.</li>
-        <li><i class="bi bi-check-circle-fill text-success"></i> Workspace scripts to lint, test, and ship the library.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> End-to-end architecture, state machine, and timing anatomy.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Configuration cheat sheets with copy-paste snippets.</li>
+        <li><i class="bi bi-check-circle-fill text-success"></i> Service APIs, hooks, and integration patterns ready for production.</li>
       </ul>
     </div>
   </div>
@@ -28,83 +29,219 @@
 
 <hr class="section-divider" />
 
-<section class="docs-layout">
-  <div class="primary">
-    <div id="install" class="card shadow-sm">
-      <div class="card-body">
-        <h3 class="card-title">Install</h3>
-        <h6 class="card-subtitle mb-3 text-muted">Add the package and schematic</h6>
-        <div class="command-list">
-          <div *ngFor="let cmd of installCommands" class="command">
-            <code>{{ cmd }}</code>
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="copy(cmd)">
-              <i class="bi bi-clipboard"></i>
-              Copy
-            </button>
-          </div>
-        </div>
-        <p class="helper">
-          The schematic wires default providers, creates <code>session-timeout.providers.ts</code>, and spreads them into
-          <code>app.config.ts</code> so the service is ready immediately.
-        </p>
-        <p class="helper">
-          Need troubleshooting tips? Visit the <a routerLink="/faq">FAQ</a> for common configuration errors.
-        </p>
-      </div>
-    </div>
-
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h3 class="card-title">Quick start</h3>
-        <h6 class="card-subtitle mb-3 text-muted">Drop-in providers</h6>
-        <div class="code-block">
-          <pre><code>{{ providerSnippet }}</code></pre>
-        </div>
-        <div class="code-block">
-          <pre><code>{{ configSnippet }}</code></pre>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <aside class="secondary">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h3 class="card-title">Recipes</h3>
-        <h6 class="card-subtitle mb-3 text-muted">Practical tweaks</h6>
-        <div class="recipe">
-          <span class="badge text-bg-info">Multi-tab</span>
-          <p>Assign the same <code>storageKeyPrefix</code> in every tab so extends/expirations stay in sync.</p>
-        </div>
-        <div class="recipe">
-          <span class="badge text-bg-success">HTTP</span>
-          <p>Let the interceptor reset idle for allowlisted calls or backend-marked requests.</p>
-        </div>
-        <div class="recipe">
-          <span class="badge text-bg-primary">Activity</span>
-          <p>Set <code>activityResetCooldownMs</code> to ignore rapid DOM/router noise between idle resets.</p>
-        </div>
-        <div class="recipe">
-          <span class="badge text-bg-warning">Pause/Resume</span>
-          <p>
-            Set <code>resumeBehavior: 'autoOnServerSync'</code> when you want the next successful server sync to resume a
-            paused session automatically.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h3 class="card-title">Workspace scripts</h3>
-        <h6 class="card-subtitle mb-3 text-muted">Keep quality high</h6>
-        <ul class="script-list">
-          <li *ngFor="let script of scripts">
-            <code>{{ script.command }}</code>
-            <span>{{ script.description }}</span>
+<section class="docs-content">
+  <article class="card docs-card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">On this page</h2>
+      <nav>
+        <ul class="nav-list">
+          <li *ngFor="let link of sectionNav">
+            <a [attr.href]="link.href">{{ link.label }}</a>
           </li>
         </ul>
+      </nav>
+    </div>
+  </article>
+
+  <article id="overview" class="card docs-card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">1. Overview & Concepts</h2>
+      <p>Key differentiators that make the engine suitable for enterprise timeout policies:</p>
+      <ul class="list-bullet">
+        <li *ngFor="let highlight of overviewHighlights">{{ highlight }}</li>
+      </ul>
+      <div class="code-block">
+        <pre><code>{{ architectureDiagram }}</code></pre>
+      </div>
+      <table class="table table-sm compat-table">
+        <thead>
+          <tr>
+            <th>Package</th>
+            <th>Angular</th>
+            <th>Node</th>
+            <th>RxJS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of compatibilityMatrix">
+            <th scope="row">{{ row.package }}</th>
+            <td><code>{{ row.angular }}</code></td>
+            <td><code>{{ row.node }}</code></td>
+            <td><code>{{ row.rxjs }}</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <article id="quick-start" class="card docs-card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">2. Quick Start</h2>
+      <p>Install the package, generate providers, and bootstrap the service.</p>
+      <div class="command-list">
+        <div *ngFor="let cmd of installCommands" class="command">
+          <code>{{ cmd }}</code>
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="copy(cmd)">
+            <i class="bi bi-clipboard"></i>
+            Copy
+          </button>
+        </div>
+      </div>
+      <div class="code-block">
+        <pre><code>{{ providerSnippet }}</code></pre>
+      </div>
+      <div class="code-block">
+        <pre><code>{{ configSnippet }}</code></pre>
+      </div>
+      <p class="helper">Call <code>sessionTimeout.start()</code> once shell-level services are initialised to persist the first snapshot.</p>
+    </div>
+  </article>
+
+  <article id="configuration" class="card docs-card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">3. Configuration Guide</h2>
+      <p>Understand the knobs that shape idle and countdown behaviour.</p>
+      <table class="table table-sm config-table">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let option of configOptions">
+            <th scope="row"><code>{{ option.key }}</code></th>
+            <td><code>{{ option.defaultValue }}</code></td>
+            <td>{{ option.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="code-block">
+        <pre><code>{{ timingDiagram }}</code></pre>
+      </div>
+      <div class="preset-grid">
+        <div class="preset" *ngFor="let preset of timingPresets">
+          <h4>{{ preset.name }}</h4>
+          <p>{{ preset.description }}</p>
+        </div>
       </div>
     </div>
-  </aside>
+  </article>
+
+  <article id="api" class="card docs-card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">4. Service & API Reference</h2>
+      <h3 class="section-heading">SessionTimeoutService methods</h3>
+      <table class="table table-sm service-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Signature</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let method of serviceMethods">
+            <th scope="row">{{ method.name }}</th>
+            <td><code>{{ method.signature }}</code></td>
+            <td>{{ method.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="section-heading">Signals & streams</h3>
+      <table class="table table-sm signal-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Emits</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let signal of signalRows">
+            <th scope="row">{{ signal.name }}</th>
+            <td><code>{{ signal.type }}</code></td>
+            <td>{{ signal.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="section-heading">Tokens, hooks, supporting providers</h3>
+      <table class="table table-sm token-table">
+        <thead>
+          <tr>
+            <th>Token / helper</th>
+            <th>Type</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let token of tokenRows">
+            <th scope="row">{{ token.name }}</th>
+            <td><code>{{ token.type }}</code></td>
+            <td>{{ token.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="section-heading">Lifecycle events</h3>
+      <table class="table table-sm event-table">
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>When it fires</th>
+            <th>Metadata highlights</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let event of eventRows">
+            <th scope="row">{{ event.type }}</th>
+            <td>{{ event.when }}</td>
+            <td>{{ event.meta }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="helper">Provide <code>SESSION_TIMEOUT_CONFIG</code> early, share a <code>storageKeyPrefix</code> across tabs, and plug analytics or logout flows into <code>SESSION_TIMEOUT_HOOKS</code> when <code>Expired</code> fires.</p>
+    </div>
+  </article>
+
+  <article id="recipes" class="card docs-card shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">5. Recipes & Integration Guides</h2>
+
+      <h3 class="section-heading">UI patterns</h3>
+      <div class="recipe-grid">
+        <div class="recipe-card" *ngFor="let recipe of uiPatterns">
+          <h4>{{ recipe.title }}</h4>
+          <p>{{ recipe.description }}</p>
+        </div>
+      </div>
+
+      <h3 class="section-heading">Cross-tab & multi-device</h3>
+      <ul class="list-bullet">
+        <li *ngFor="let tip of crossTabTips">{{ tip }}</li>
+      </ul>
+
+      <h3 class="section-heading">HTTP & server coordination</h3>
+      <ul class="list-bullet">
+        <li *ngFor="let tip of httpTips">{{ tip }}</li>
+      </ul>
+
+      <h3 class="section-heading">Custom activity & instrumentation</h3>
+      <ul class="list-bullet">
+        <li *ngFor="let tip of customActivityTips">{{ tip }}</li>
+      </ul>
+
+      <h3 class="section-heading">Maintainer scripts</h3>
+      <ul class="script-list">
+        <li *ngFor="let script of scripts">
+          <code>{{ script.command }}</code>
+          <span>{{ script.description }}</span>
+        </li>
+      </ul>
+    </div>
+  </article>
 </section>
