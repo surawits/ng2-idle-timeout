@@ -5,3 +5,5 @@ package-lock.json
 .DS_Store
 .tmp/
 tmp/
+!packages/ng2-idle-timeout/schematics/dist/
+!packages/ng2-idle-timeout/schematics/dist/**

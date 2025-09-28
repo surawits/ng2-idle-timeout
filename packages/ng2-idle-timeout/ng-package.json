@@ -1,14 +1,19 @@
 {
-  "$schema": "https://ng-packagr.github.io/ng-package.schema.json",
-  "dest": "dist",
-  "lib": {
-    "entryFile": "src/public-api.ts"
-  },
-  "assets": [
-    {
-      "input": "../schematics/ng-add",
-      "glob": "**/*",
-      "output": "schematics"
-    }
-  ]
+    "$schema":  "https://ng-packagr.github.io/ng-package.schema.json",
+    "dest":  "dist",
+    "lib":  {
+                "entryFile":  "src/public-api.ts"
+            },
+    "assets":  [
+                   {
+                       "input":  "schematics",
+                       "glob":  "collection.json",
+                       "output":  "schematics"
+                   },
+                   {
+                       "input":  "schematics/dist",
+                       "glob":  "**/*",
+                       "output":  "schematics/dist"
+                   }
+               ]
 }
