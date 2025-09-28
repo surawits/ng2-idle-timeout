@@ -59,25 +59,76 @@ export const sessionTimeoutProviders = [
     provide: SESSION_TIMEOUT_CONFIG,
     useValue: {
       storageKeyPrefix: 'app-session',
-      idleGraceMs: 60000,
-      countdownMs: 300000,
-      warnBeforeMs: 60000,
-      activityResetCooldownMs: 5000,
+      idleGraceMs: 60_000,
+      countdownMs: 300_000,
+      warnBeforeMs: 60_000,
       resumeBehavior: 'autoOnServerSync'
     }
   }
 ];`;
 
-  readonly configSnippet = `// app.config.ts
+  readonly standaloneBootstrapSnippet = `// main.ts
+import { bootstrapApplication } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
-import { sessionTimeoutProviders } from './session-timeout.providers';
+import { AppComponent } from './app/app.component';
+import { routes } from './app/app.routes';
+import { sessionTimeoutProviders } from './app/session-timeout.providers';
 
-export const appConfig = {
+bootstrapApplication(AppComponent, {
   providers: [
     provideRouter(routes),
     ...sessionTimeoutProviders
   ]
-};`;
+});`;
+
+  readonly ngModuleBootstrapSnippet = `// app.module.ts
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { AppComponent } from './app.component';
+import { sessionTimeoutProviders } from './session-timeout.providers';
+
+@NgModule({
+  declarations: [AppComponent],
+  imports: [BrowserModule /* other modules */],
+  providers: [...sessionTimeoutProviders],
+  bootstrap: [AppComponent]
+})
+export class AppModule {}
+`;
+
+  readonly startSnippet = `// app.component.ts (or shell service)
+constructor(private readonly sessionTimeout: SessionTimeoutService) {}
+
+ngOnInit(): void {
+  this.sessionTimeout.start();
+}`;
+
+  readonly sampleComponentSnippet = `// session-status.component.ts
+import { Component, inject } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { SessionTimeoutService } from 'ng2-idle-timeout';
+
+@Component({
+  selector: 'app-session-status',
+  standalone: true,
+  imports: [DecimalPipe],
+  templateUrl: './session-status.component.html'
+})
+export class SessionStatusComponent {
+  private readonly sessionTimeout = inject(SessionTimeoutService);
+  protected readonly state = this.sessionTimeout.stateSignal;
+  protected readonly remainingMs = this.sessionTimeout.remainingMsSignal;
+  protected readonly events$ = this.sessionTimeout.events$;
+}`;
+
+  readonly sampleTemplateSnippet = `<!-- session-status.component.html -->
+<section class="session-status">
+  <p>State: {{ state() }}</p>
+  <p>Time remaining: {{ (remainingMs() / 1000) | number:'1.0-0' }}s</p>
+  <ng-container *ngIf="(events$ | async) as event">
+    <p>Last event: {{ event.type }}</p>
+  </ng-container>
+</section>`;
 
   readonly configOptions = [
     { key: 'idleGraceMs', defaultValue: '60000', description: 'How long the session may idle before countdown starts.' },
@@ -180,3 +231,4 @@ export const appConfig = {
     }
   }
 }
+

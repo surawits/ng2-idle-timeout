@@ -46,13 +46,15 @@
 
 **Compatibility matrix**
 
-| Package            | Angular | Node   | RxJS      |
-|--------------------|---------|--------|-----------|
-| `ng2-idle-timeout` | 16-20   | >=18.13| >=7.5 < 9 |
+| Package            | Angular | Node    | RxJS      |
+|--------------------|---------|---------|-----------|
+| `ng2-idle-timeout` | 16-20   | >=18.13 | >=7.5 < 9 |
 
 ---
 
 ## Quick Start
+
+Your application might be bootstrapped with the standalone APIs (`bootstrapApplication`) or with an NgModule. If you do not have `app.config.ts`, register the `sessionTimeoutProviders` directly where you bootstrap (for example in `main.ts` or `AppModule`). The library works the same in both setups.
 
 1. **Install**
 
@@ -60,13 +62,13 @@
    npm install ng2-idle-timeout
    ```
 
-   or scaffold everything:
+   Or scaffold everything:
 
    ```bash
    ng add ng2-idle-timeout
    ```
 
-2. **Provide configuration**
+2. **Define shared providers**
 
    ```ts
    // session-timeout.providers.ts
@@ -87,23 +89,91 @@
    ];
    ```
 
+3. **Register providers with your bootstrap**
+
+   **Standalone bootstrap (`main.ts`)**
+
    ```ts
-   // app.config.ts
+   import { bootstrapApplication } from '@angular/platform-browser';
    import { provideRouter } from '@angular/router';
+   import { AppComponent } from './app/app.component';
+   import { routes } from './app/app.routes';
+   import { sessionTimeoutProviders } from './app/session-timeout.providers';
+
+   bootstrapApplication(AppComponent, {
+     providers: [
+       provideRouter(routes),
+       ...sessionTimeoutProviders
+     ]
+   });
+   ```
+
+   **NgModule bootstrap (`app.module.ts`)**
+
+   ```ts
+   import { NgModule } from '@angular/core';
+   import { BrowserModule } from '@angular/platform-browser';
+   import { AppComponent } from './app.component';
    import { sessionTimeoutProviders } from './session-timeout.providers';
 
-   export const appConfig = {
-     providers: [provideRouter(routes), ...sessionTimeoutProviders]
-   };
+   @NgModule({
+     declarations: [AppComponent],
+     imports: [BrowserModule /* other modules */],
+     providers: [...sessionTimeoutProviders],
+     bootstrap: [AppComponent]
+   })
+   export class AppModule {}
    ```
 
-3. **Start the engine once shell services are ready**
+   > If you plan to use the HTTP activity helpers, also add `provideHttpClient(withInterceptorsFromDi())` in the standalone bootstrap or import `HttpClientModule` and register `SessionActivityHttpInterceptor` in your NgModule.
+
+4. **Start the engine once dependencies are ready**
 
    ```ts
-   sessionTimeout.start();
+   // app.component.ts (or another shell service)
+   constructor(private readonly sessionTimeout: SessionTimeoutService) {}
+
+   ngOnInit(): void {
+     this.sessionTimeout.start();
+   }
    ```
 
-4. **Verify with the experience app playground**
+5. **Sample usage (inject the service)**
+
+   ```ts
+   // session-status.component.ts
+   import { Component, inject } from '@angular/core';
+   import { DecimalPipe } from '@angular/common';
+   import { SessionTimeoutService } from 'ng2-idle-timeout';
+
+   @Component({
+     selector: 'app-session-status',
+     standalone: true,
+     imports: [DecimalPipe],
+     templateUrl: './session-status.component.html'
+   })
+   export class SessionStatusComponent {
+     private readonly sessionTimeout = inject(SessionTimeoutService);
+     protected readonly state = this.sessionTimeout.stateSignal;
+     protected readonly remainingMs = this.sessionTimeout.remainingMsSignal;
+     protected readonly events$ = this.sessionTimeout.events$;
+   }
+   ```
+
+   ```html
+   <!-- session-status.component.html -->
+   <section class="session-status">
+     <p>State: {{ state() }}</p>
+     <p>Time remaining: {{ (remainingMs() / 1000) | number:'1.0-0' }}s</p>
+     <ng-container *ngIf="(events$ | async) as event">
+       <p>Last event: {{ event.type }}</p>
+     </ng-container>
+   </section>
+   ```
+
+   Call `sessionTimeout.start()` once (as shown above) before relying on the signals; they emit immediately after bootstrap.
+
+6. **Explore the demo**
 
    ```bash
    npm run demo:start
@@ -214,15 +284,15 @@ Idle            Countdown            Warn              Expired
 ## Additional Resources
 
 - **Docs & playground**: `npm run demo:start` (Angular 18 experience app at http://localhost:4200).
-- **Release notes**: see [`RELEASE_NOTES.md`](./RELEASE_NOTES.md) for breaking changes and upgrade hints.
-- **Support & issues**: open tickets at [github.com/ng2-idle-timeout/ng2-idle-timeout](https://github.com/ng2-idle-timeout/ng2-idle-timeout).
+- **Release notes**: see `RELEASE_NOTES.md` for breaking changes and upgrade hints.
+- **Support & issues**: open tickets at https://github.com/ng2-idle-timeout/ng2-idle-timeout.
 
 **Maintainer scripts**
 
-- `npm run build --workspace=ng2-idle-timeout` � build the library with ng-packagr.
-- `npm run test --workspace=ng2-idle-timeout` � run the Jest suite for services, guards, and interceptors.
-- `npm run demo:start` � launch the documentation and playground app locally.
-- `npm run demo:build` � production build of the experience app.
-- `npm run demo:test` � sanity-check that the demo compiles in development mode.
+- `npm run build --workspace=ng2-idle-timeout` - build the library with ng-packagr.
+- `npm run test --workspace=ng2-idle-timeout` - run the Jest suite for services, guards, and interceptors.
+- `npm run demo:start` - launch the documentation and playground app locally.
+- `npm run demo:build` - production build of the experience app.
+- `npm run demo:test` - sanity-check that the demo compiles in development mode.
 
-MIT licensed � happy idling!
+MIT licensed - happy idling!

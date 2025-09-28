@@ -77,7 +77,8 @@
   <article id="quick-start" class="card docs-card shadow-sm">
     <div class="card-body">
       <h2 class="card-title">2. Quick Start</h2>
-      <p>Install the package, generate providers, and bootstrap the service.</p>
+      <p>Install the package, define shared providers, and register them where you bootstrap the app.</p>
+      <p class="helper">No <code>app.config.ts</code>? Wire the providers directly in <code>main.ts</code> (standalone) or inside <code>AppModule</code>.</p>
       <div class="command-list">
         <div *ngFor="let cmd of installCommands" class="command">
           <code>{{ cmd }}</code>
@@ -87,13 +88,34 @@
           </button>
         </div>
       </div>
+      <h3 class="section-heading">Define shared providers</h3>
       <div class="code-block">
         <pre><code>{{ providerSnippet }}</code></pre>
       </div>
+      <h3 class="section-heading">Register providers with your bootstrap</h3>
+      <p><strong>Standalone bootstrap:</strong> <code>main.ts</code></p>
       <div class="code-block">
-        <pre><code>{{ configSnippet }}</code></pre>
+        <pre><code>{{ standaloneBootstrapSnippet }}</code></pre>
+      </div>
+      <p><strong>NgModule bootstrap:</strong> <code>app.module.ts</code></p>
+      <div class="code-block">
+        <pre><code>{{ ngModuleBootstrapSnippet }}</code></pre>
+      </div>
+      <p class="helper">To opt into HTTP activity helpers, add <code>provideHttpClient(withInterceptorsFromDi())</code> (standalone) or import <code>HttpClientModule</code> and provide <code>SessionActivityHttpInterceptor</code>.</p>
+      <h3 class="section-heading">Start the engine</h3>
+      <div class="code-block">
+        <pre><code>{{ startSnippet }}</code></pre>
       </div>
       <p class="helper">Call <code>sessionTimeout.start()</code> once shell-level services are initialised to persist the first snapshot.</p>
+      <h3 class="section-heading">Sample usage (inject the service)</h3>
+      <div class="code-block">
+        <pre><code>{{ sampleComponentSnippet }}</code></pre>
+      </div>
+      <div class="code-block">
+        <pre><code>{{ sampleTemplateSnippet }}</code></pre>
+      </div>
+      <p class="helper">Expose the signals (e.g. <code>state()</code>, <code>remainingMs()</code>) and optional <code>events$</code> stream in your components after calling <code>start()</code>.</p>
+      <p class="helper">Spin up the docs and playground with <code>npm run demo:start</code> at <code>http://localhost:4200</code> to validate scenarios end-to-end.</p>
     </div>
   </article>
 
