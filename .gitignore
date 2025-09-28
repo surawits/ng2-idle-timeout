@@ -7,3 +7,6 @@ package-lock.json
 tmp/
 !packages/ng2-idle-timeout/schematics/dist/
 !packages/ng2-idle-timeout/schematics/dist/**
+# Codex/AI tooling artifacts
+.control/
+.codex/

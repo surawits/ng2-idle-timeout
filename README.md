@@ -2,6 +2,8 @@
 
 > Zoneless-friendly session timeout orchestration for Angular 16-20.
 
+> Crafted by Codex.
+
 `ng2-idle-timeout` keeps every tab of your Angular application in sync while tracking user activity, coordinating leader election, and handling server-aligned countdowns without relying on Angular zones.
 
 ---
@@ -217,10 +219,10 @@ Idle            Countdown            Warn              Expired
 
 **Maintainer scripts**
 
-- `npm run build --workspace=ng2-idle-timeout` – build the library with ng-packagr.
-- `npm run test --workspace=ng2-idle-timeout` – run the Jest suite for services, guards, and interceptors.
-- `npm run demo:start` – launch the documentation and playground app locally.
-- `npm run demo:build` – production build of the experience app.
-- `npm run demo:test` – sanity-check that the demo compiles in development mode.
+- `npm run build --workspace=ng2-idle-timeout` ï¿½ build the library with ng-packagr.
+- `npm run test --workspace=ng2-idle-timeout` ï¿½ run the Jest suite for services, guards, and interceptors.
+- `npm run demo:start` ï¿½ launch the documentation and playground app locally.
+- `npm run demo:build` ï¿½ production build of the experience app.
+- `npm run demo:test` ï¿½ sanity-check that the demo compiles in development mode.
 
-MIT licensed – happy idling!
+MIT licensed ï¿½ happy idling!
