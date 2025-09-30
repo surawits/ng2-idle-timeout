@@ -116,7 +116,7 @@
                   type="checkbox"
                   [id]="'dom-event-' + eventName"
                   [checked]="isDomEventSelected(eventName)"
-                  (change)="toggleDomEvent(eventName, $event.target.checked)"
+                  (change)="toggleDomEvent(eventName, $event)"
                 />
                 <label class="form-check-label" [for]="'dom-event-' + eventName">
                   {{ domEventLabel(eventName) }}
@@ -227,18 +227,24 @@
             <span class="metric-value">{{ activityCooldownRemainingSeconds() }} s</span>
           </div>
           <div class="metric border rounded-3 flex-fill">
+            <span class="metric-label">Total remaining</span>
+            <span class="metric-value">{{ totalRemainingSeconds() }} s</span>
+          </div>
+        </div>
+        <div class="metric-row d-flex flex-column flex-md-row gap-3">
+          <div class="metric border rounded-3 flex-fill">
             <span class="metric-label">Idle remaining</span>
             <span class="metric-value">{{ idleRemainingSeconds() }} s</span>
+          </div>
+          <div class="metric border rounded-3 flex-fill">
+            <span class="metric-label">Countdown remaining</span>
+            <span class="metric-value">{{ countdownRemainingSeconds() }} s</span>
           </div>
         </div>
         <div class="metric-row d-flex flex-column flex-md-row gap-3">
           <div class="metric border rounded-3 flex-fill">
             <span class="metric-label">Warning modal in</span>
             <span class="metric-value">{{ warningModalCountdownSeconds() }} s</span>
-          </div>
-          <div class="metric border rounded-3 flex-fill">
-            <span class="metric-label">Countdown remaining</span>
-            <span class="metric-value">{{ countdownRemainingSeconds() }} s</span>
           </div>
         </div>
       </div>

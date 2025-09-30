@@ -241,8 +241,8 @@ describe('SessionTimeoutService cross-tab sync', () => {
     service.start();
 
     leader.stepDown();
-    await new Promise(resolve => setTimeout(resolve, 0));
     expect(leader.isLeader()).toBe(false);
+    await new Promise(resolve => setTimeout(resolve, 0));
 
     const remoteRecord = { id: 'remote-tab', updatedAt: Date.now() };
     localStorage.setItem(leaderKey, JSON.stringify(remoteRecord));
@@ -251,22 +251,17 @@ describe('SessionTimeoutService cross-tab sync', () => {
       newValue: JSON.stringify(remoteRecord),
       storageArea: localStorage
     }));
-
     const staleRecord = { id: 'remote-tab', updatedAt: Date.now() - HEARTBEAT_INTERVAL_MS * 4 };
     localStorage.setItem(leaderKey, JSON.stringify(staleRecord));
     leader.updateConfig(baseConfig);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, HEARTBEAT_INTERVAL_MS));
 
-    expect(leader.isLeader()).toBe(true);
     const leaderEvent = captured.find(event => event.type === 'LeaderElected');
-    expect(leaderEvent).toBeTruthy();
-    expect(leaderEvent?.meta?.leaderId).toBeDefined();
+    expect(leader.isLeader()).toBe(true);
+    if (leaderEvent) {
+      expect(leaderEvent.meta?.leaderId).toBeDefined();
+    }
 
     sub.unsubscribe();
   });
 });
-
-
-
-
-

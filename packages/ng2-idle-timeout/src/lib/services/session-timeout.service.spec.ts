@@ -152,6 +152,22 @@ describe('SessionTimeoutService', () => {
     return service.getSnapshot();
   }
 
+  function idleRemaining(): number {
+    return service.idleRemainingMsSignal();
+  }
+
+  function countdownRemaining(): number {
+    return service.countdownRemainingMsSignal();
+  }
+
+  function totalRemaining(): number {
+    return service.totalRemainingMsSignal();
+  }
+
+  function cooldownRemaining(): number {
+    return service.activityCooldownRemainingMsSignal();
+  }
+
   it('starts in IDLE and enters countdown after idle grace period', () => {
     service.start();
     expect(snapshot().state).toBe('IDLE');
@@ -260,6 +276,76 @@ describe('SessionTimeoutService', () => {
     const after = snapshot();
     expect(after.idleStartAt).toBe(before.idleStartAt);
     expect(after.remainingMs).toBe(before.remainingMs);
+  });
+
+  it('exposes separate phase signals for idle, countdown, and total remaining time', () => {
+    service.start();
+
+    expect(idleRemaining()).toBe(baseConfig.idleGraceMs);
+    expect(countdownRemaining()).toBe(baseConfig.countdownMs);
+    expect(totalRemaining()).toBe(baseConfig.idleGraceMs + baseConfig.countdownMs);
+    expect(cooldownRemaining()).toBe(0);
+
+    time.advance(100);
+    manualTick();
+
+    expect(idleRemaining()).toBe(baseConfig.idleGraceMs - 100);
+    expect(countdownRemaining()).toBe(baseConfig.countdownMs);
+    expect(totalRemaining()).toBe((baseConfig.idleGraceMs - 100) + baseConfig.countdownMs);
+
+    time.advance(baseConfig.idleGraceMs - 100 + 1);
+    manualTick();
+
+    expect(snapshot().state).toBe('COUNTDOWN');
+    expect(idleRemaining()).toBe(0);
+    expect(countdownRemaining()).toBe(baseConfig.countdownMs);
+    expect(totalRemaining()).toBe(baseConfig.countdownMs);
+  });
+
+  it('tracks activity cooldown remaining and suppresses resets within the window', () => {
+    service.setConfig({ activityResetCooldownMs: 5000 });
+    service.start();
+
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+
+    domService.emit({ type: 'click' });
+
+    expect(idleRemaining()).toBe(baseConfig.idleGraceMs);
+    expect(countdownRemaining()).toBe(baseConfig.countdownMs);
+    expect(cooldownRemaining()).toBe(5000);
+
+    const resetIdleStart = snapshot().idleStartAt;
+
+    time.advance(2000);
+    manualTick();
+    expect(cooldownRemaining()).toBe(3000);
+
+    domService.emit({ type: 'mousemove' });
+
+    expect(snapshot().idleStartAt).toBe(resetIdleStart);
+    expect(cooldownRemaining()).toBe(3000);
+
+    time.advance(3000);
+    manualTick();
+    expect(cooldownRemaining()).toBe(0);
+
+    domService.emit({ type: 'scroll' });
+
+    expect(idleRemaining()).toBe(baseConfig.idleGraceMs);
+    expect(countdownRemaining()).toBe(baseConfig.countdownMs);
+    expect(cooldownRemaining()).toBe(5000);
+  });
+
+  it('reconfigures phase signals without requiring a restart', () => {
+    service.start();
+
+    service.setConfig({ idleGraceMs: 400, countdownMs: 1200, activityResetCooldownMs: 2000 });
+
+    expect(idleRemaining()).toBe(400);
+    expect(countdownRemaining()).toBe(1200);
+    expect(totalRemaining()).toBe(1600);
+    expect(cooldownRemaining()).toBe(0);
   });
 
   it('throttles DOM activity resets using activityResetCooldownMs', () => {

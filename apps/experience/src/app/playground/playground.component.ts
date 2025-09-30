@@ -2,7 +2,12 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { SessionTimeoutService, DOM_ACTIVITY_EVENT_NAMES, DEFAULT_SESSION_TIMEOUT_CONFIG, type DomActivityEventName } from 'ng2-idle-timeout';
+import {
+  SessionTimeoutService,
+  DOM_ACTIVITY_EVENT_NAMES,
+  DEFAULT_SESSION_TIMEOUT_CONFIG,
+  type DomActivityEventName
+} from 'ng2-idle-timeout';
 
 interface EventView {
   type: string;
@@ -28,7 +33,16 @@ interface ActivityView {
   styleUrl: './playground.component.scss'
 })
 export class PlaygroundComponent {
-  private readonly sessionTimeout = inject(SessionTimeoutService);\r\n  private readonly destroyRef = inject(DestroyRef);\r\n  private readonly router = inject(Router);\r\n  private readonly initialConfig = this.sessionTimeout.getConfig();\r\n\r\n  readonly domEventOptions = DOM_ACTIVITY_EVENT_NAMES;\r\n  readonly defaultDomEventSelection = new Set<DomActivityEventName>(DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents);\r\n  domEventSelection = new Set<DomActivityEventName>(this.initialConfig.domActivityEvents);
+  private readonly sessionTimeout = inject(SessionTimeoutService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly router = inject(Router);
+  private readonly initialConfig = this.sessionTimeout.getConfig();
+
+  readonly domEventOptions = DOM_ACTIVITY_EVENT_NAMES;
+  readonly defaultDomEventSelection = new Set<DomActivityEventName>(
+    DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents
+  );
+  domEventSelection = new Set<DomActivityEventName>(this.initialConfig.domActivityEvents);
 
   idleGraceSeconds = 60;
   countdownSeconds = 300;
@@ -49,8 +63,6 @@ export class PlaygroundComponent {
   private readonly serviceActive = signal(false);
 
   private readonly configState = signal(this.initialConfig);
-  private readonly renderNow = signal(Date.now());
-  private renderTimerHandle: ReturnType<typeof setInterval> | null = null;
 
   readonly snapshot = computed(() => this.sessionTimeout.getSnapshot());
   readonly sessionState = computed(() => this.snapshot().state);
@@ -77,55 +89,42 @@ export class PlaygroundComponent {
     if (!this.isSessionActive()) {
       return 0;
     }
-    const snapshot = this.snapshot();
-    const config = this.configState();
-    if (snapshot.state !== 'IDLE' || snapshot.idleStartAt == null) {
-      return 0;
-    }
-    const remainingMs = Math.max(0, snapshot.idleStartAt + config.idleGraceMs - this.renderNow());
-    return Math.ceil(remainingMs / 1000);
+    return Math.max(0, Math.ceil(this.sessionTimeout.idleRemainingMsSignal() / 1000));
   });
 
   readonly countdownRemainingSeconds = computed(() => {
     if (!this.isSessionActive()) {
       return 0;
     }
-    const snapshot = this.snapshot();
-    const config = this.configState();
-    const target = snapshot.countdownEndAt;
-    if (target == null) {
-      return snapshot.state === 'IDLE' ? Math.round(config.countdownMs / 1000) : 0;
-    }
-    const remainingMs = Math.max(0, target - this.renderNow());
-    return Math.ceil(remainingMs / 1000);
+    return Math.max(0, Math.ceil(this.sessionTimeout.countdownRemainingMsSignal() / 1000));
   });
 
   readonly activityCooldownRemainingSeconds = computed(() => {
-    const config = this.configState();
-    const baseSeconds = Math.max(0, Math.ceil(config.activityResetCooldownMs / 1000));
+    return Math.max(0, Math.ceil(this.sessionTimeout.activityCooldownRemainingMsSignal() / 1000));
+  });
+
+  readonly totalRemainingSeconds = computed(() => {
     if (!this.isSessionActive()) {
-      return baseSeconds;
+      return 0;
     }
-    const lastActivityAt = this.snapshot().lastActivityAt;
-    if (lastActivityAt == null) {
-      return baseSeconds;
-    }
-    const remainingMs = lastActivityAt + config.activityResetCooldownMs - this.renderNow();
-    return Math.max(0, Math.ceil(remainingMs / 1000));
+    return Math.max(0, Math.ceil(this.sessionTimeout.totalRemainingMsSignal() / 1000));
   });
 
   readonly warningModalCountdownSeconds = computed(() => {
     if (!this.isSessionActive()) {
       return 0;
     }
-    const snapshot = this.snapshot();
-    const config = this.configState();
-    if (snapshot.state === 'WARN' || snapshot.state === 'EXPIRED') {
+    const state = this.sessionTimeout.stateSignal();
+    if (state === 'WARN' || state === 'EXPIRED' || state === 'IDLE') {
       return 0;
     }
-    if (snapshot.state === 'COUNTDOWN') {
-      const millisecondsUntilWarn = Math.max(0, snapshot.remainingMs - config.warnBeforeMs);
-      return Math.ceil(millisecondsUntilWarn / 1000);
+    if (state === 'COUNTDOWN') {
+      const remainingMs = this.sessionTimeout.countdownRemainingMsSignal();
+      const warnBeforeMs = this.configState().warnBeforeMs;
+      if (remainingMs <= warnBeforeMs) {
+        return 0;
+      }
+      return Math.ceil((remainingMs - warnBeforeMs) / 1000);
     }
     return 0;
   });
@@ -151,7 +150,6 @@ export class PlaygroundComponent {
 
   constructor() {
     this.applyConfig();
-    this.startRenderTicker();
     this.sessionTimeout.stop();
 
     const eventsSub = this.sessionTimeout.events$.subscribe(event => {
@@ -186,15 +184,34 @@ export class PlaygroundComponent {
     this.destroyRef.onDestroy(() => {
       eventsSub.unsubscribe();
       activitySub.unsubscribe();
-      this.stopRenderTicker();
     });
   }
 
-  applyConfig(): void {\r\n    const domActivityEvents = this.currentDomActivityEvents();\r\n    this.sessionTimeout.setConfig({\r\n      idleGraceMs: this.idleGraceSeconds * 1000,\r\n      countdownMs: this.countdownSeconds * 1000,\r\n      warnBeforeMs: this.warnBeforeSeconds * 1000,\r\n      activityResetCooldownMs: this.activityCooldownSeconds * 1000,\r\n      resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',\r\n      domActivityEvents\r\n    });\r\n    const nextConfig = this.sessionTimeout.getConfig();\r\n    this.configState.set(nextConfig);\r\n    this.domEventSelection = new Set<DomActivityEventName>(nextConfig.domActivityEvents);\r\n    if (!this.serviceActive()) {\r\n      this.sessionTimeout.stop();\r\n    }\r\n  }\r\n\r\n  isDomEventSelected(event: DomActivityEventName): boolean {
+  applyConfig(): void {
+    const domActivityEvents = this.currentDomActivityEvents();
+    this.sessionTimeout.setConfig({
+      idleGraceMs: this.idleGraceSeconds * 1000,
+      countdownMs: this.countdownSeconds * 1000,
+      warnBeforeMs: this.warnBeforeSeconds * 1000,
+      activityResetCooldownMs: this.activityCooldownSeconds * 1000,
+      resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',
+      domActivityEvents
+    });
+    const nextConfig = this.sessionTimeout.getConfig();
+    this.configState.set(nextConfig);
+    this.domEventSelection = new Set<DomActivityEventName>(nextConfig.domActivityEvents);
+    if (!this.serviceActive()) {
+      this.sessionTimeout.stop();
+    }
+  }
+
+  isDomEventSelected(event: DomActivityEventName): boolean {
     return this.domEventSelection.has(event);
   }
 
-  toggleDomEvent(event: DomActivityEventName, enabled: boolean): void {
+  toggleDomEvent(event: DomActivityEventName, change: Event): void {
+    const target = change.target;
+    const enabled = target instanceof HTMLInputElement ? target.checked : false;
     if (enabled) {
       this.domEventSelection.add(event);
     } else {
@@ -340,22 +357,6 @@ export class PlaygroundComponent {
     this.activityPage = Math.max(0, this.activityPage - 1);
   }
 
-  private startRenderTicker(): void {
-    if (this.renderTimerHandle != null) {
-      return;
-    }
-    this.renderTimerHandle = window.setInterval(() => {
-      this.renderNow.set(Date.now());
-    }, 250);
-  }
-
-  private stopRenderTicker(): void {
-    if (this.renderTimerHandle != null) {
-      clearInterval(this.renderTimerHandle);
-      this.renderTimerHandle = null;
-    }
-  }
-
   private summariseMeta(meta: Record<string, unknown> | undefined): string | undefined {
     if (!meta) {
       return undefined;
@@ -384,8 +385,3 @@ export class PlaygroundComponent {
     };
   }
 }
-
-
-
-
-

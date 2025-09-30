@@ -62,16 +62,7 @@ export class SessionTimeoutService {
   private leaderState: boolean | null = null;
   private readonly leaderWatcher = this.leaderElection
     ? effect(() => {
-        const isLeader = this.leaderElection!.isLeader();
-        const leaderId = this.leaderElection!.leaderId();
-        if (this.leaderState === null) {
-          this.leaderState = isLeader;
-          return;
-        }
-        if (this.leaderState !== isLeader) {
-          this.leaderState = isLeader;
-          this.emitEvent(isLeader ? 'LeaderElected' : 'LeaderLost', { leaderId });
-        }
+        this.syncLeaderState();
       })
     : null;
   private readonly storage: StorageAdapter = createStorage();
@@ -114,8 +105,18 @@ export class SessionTimeoutService {
 
   private readonly onExpireCallbacks = new Set<(snapshot: SessionSnapshot) => void | Promise<void>>();
 
+  private readonly idleRemainingMsInternal = signal(0);
+  private readonly countdownRemainingMsInternal = signal(0);
+  private readonly totalRemainingMsInternal = signal(0);
+  private readonly activityCooldownRemainingMsInternal = signal(0);
+
+  readonly idleRemainingMsSignal = this.idleRemainingMsInternal.asReadonly();
+  readonly activityCooldownRemainingMsSignal = this.activityCooldownRemainingMsInternal.asReadonly();
+  readonly countdownRemainingMsSignal = this.countdownRemainingMsInternal.asReadonly();
+  readonly totalRemainingMsSignal = this.totalRemainingMsInternal.asReadonly();
+
   readonly stateSignal: Signal<SessionState> = computed(() => this.snapshotSignal().state);
-  readonly remainingMsSignal: Signal<number> = computed(() => this.snapshotSignal().remainingMs);
+  readonly remainingMsSignal: Signal<number> = this.totalRemainingMsSignal;
   readonly isWarnSignal: Signal<boolean> = computed(() => this.snapshotSignal().state === 'WARN');
   readonly isExpiredSignal: Signal<boolean> = computed(() => this.snapshotSignal().state === 'EXPIRED');
   private readonly lastActivitySignal: Signal<number | null> = computed(() => this.snapshotSignal().lastActivityAt);
@@ -137,7 +138,10 @@ export class SessionTimeoutService {
     this.routerActivity?.updateConfig(config);
     this.serverTime?.configure(config);
     this.leaderElection?.updateConfig(config);
+    this.syncLeaderState();
     this.setupCrossTabChannel(config);
+    this.refreshDerivedDurations(undefined, config);
+    this.refreshActivityCooldownRemaining(undefined, config);
     if (!this.isRestoring) {
       persistConfig(this.storage, config.storageKeyPrefix, config);
     }
@@ -159,6 +163,8 @@ export class SessionTimeoutService {
     this.registerServerTimeListener();
 
     this.restoreFromStorage();
+    this.refreshDerivedDurations();
+    this.refreshActivityCooldownRemaining();
 
     this.destroyRef.onDestroy(() => {
       this.destroy$.next();
@@ -320,6 +326,8 @@ export class SessionTimeoutService {
     this.configSignal.set(config);
 
     this.lastAutoActivityResetAt = null;
+    this.refreshDerivedDurations(undefined, config);
+    this.refreshActivityCooldownRemaining(undefined, config);
     if (issues.length > 0) {
       issues.forEach(issue => this.logger.warn('Invalid config field: ' + issue.field + ' - ' + issue.message));
     }
@@ -359,14 +367,16 @@ export class SessionTimeoutService {
   }
 
   private handleTick(): void {
-    const snapshot = this.snapshotSignal();
     const config = this.configSignal();
+    const timestamp = this.timeSource.now();
+    this.refreshActivityCooldownRemaining(timestamp, config);
+
+    const snapshot = this.snapshotSignal();
 
     if (snapshot.paused || snapshot.state === 'EXPIRED') {
+      this.refreshDerivedDurations(timestamp, config);
       return;
     }
-
-    const timestamp = this.timeSource.now();
 
     if (snapshot.idleStartAt == null) {
       return;
@@ -425,6 +435,7 @@ export class SessionTimeoutService {
     if (config.activityResetCooldownMs > 0) {
       const lastAcceptedAt = this.lastAutoActivityResetAt;
       if (lastAcceptedAt != null && now - lastAcceptedAt < config.activityResetCooldownMs) {
+        this.refreshActivityCooldownRemaining(now, config);
         return;
       }
     }
@@ -440,6 +451,7 @@ export class SessionTimeoutService {
       return;
     }
     this.lastAutoActivityResetAt = now;
+    this.refreshActivityCooldownRemaining(now, config);
     this.executeWithDelay('resetIdle', () => {
       this.resetIdleInternal(eventType, meta);
     });
@@ -630,6 +642,7 @@ export class SessionTimeoutService {
       this.isRestoring = true;
       this.configSignal.set(config);
       this.lastAutoActivityResetAt = null;
+      this.refreshActivityCooldownRemaining(undefined, config);
       this.isRestoring = false;
     }
 
@@ -710,6 +723,84 @@ export class SessionTimeoutService {
       paused: persisted.paused
     });
     this.isRestoring = false;
+    this.refreshDerivedDurations(now, config);
+  }
+
+  private refreshDerivedDurations(now?: number, config?: SessionTimeoutConfig): void {
+    const effectiveConfig = config ?? this.configSignal();
+    const timestamp = now ?? this.timeSource.now();
+    const snapshot = this.snapshotSignal();
+
+    if (snapshot.state === 'EXPIRED') {
+      this.idleRemainingMsInternal.set(0);
+      this.countdownRemainingMsInternal.set(0);
+      this.totalRemainingMsInternal.set(0);
+      return;
+    }
+
+    let idleRemaining = 0;
+    if (snapshot.state === 'IDLE') {
+      if (snapshot.paused) {
+        idleRemaining = Math.max(0, Math.min(snapshot.remainingMs, effectiveConfig.idleGraceMs));
+      } else if (snapshot.idleStartAt != null) {
+        const elapsed = Math.max(0, timestamp - snapshot.idleStartAt);
+        idleRemaining = Math.max(0, effectiveConfig.idleGraceMs - elapsed);
+      } else {
+        idleRemaining = effectiveConfig.idleGraceMs;
+      }
+    }
+
+    let countdownRemaining = 0;
+    if (snapshot.state === 'COUNTDOWN' || snapshot.state === 'WARN') {
+      if (snapshot.paused) {
+        countdownRemaining = Math.max(0, snapshot.remainingMs);
+      } else if (snapshot.countdownEndAt != null) {
+        countdownRemaining = Math.max(0, snapshot.countdownEndAt - timestamp);
+      } else {
+        countdownRemaining = Math.max(0, snapshot.remainingMs);
+      }
+    } else if (snapshot.state === 'IDLE') {
+      countdownRemaining = effectiveConfig.countdownMs;
+    }
+
+    this.idleRemainingMsInternal.set(idleRemaining);
+    this.countdownRemainingMsInternal.set(countdownRemaining);
+    const totalRemaining = snapshot.state === 'IDLE' ? idleRemaining + countdownRemaining : countdownRemaining;
+    this.totalRemainingMsInternal.set(Math.max(0, totalRemaining));
+  }
+
+  private refreshActivityCooldownRemaining(now?: number, config?: SessionTimeoutConfig): void {
+    const effectiveConfig = config ?? this.configSignal();
+    const timestamp = now ?? this.timeSource.now();
+
+    let remaining = 0;
+    if (effectiveConfig.activityResetCooldownMs > 0 && this.lastAutoActivityResetAt != null) {
+      const elapsed = Math.max(0, timestamp - this.lastAutoActivityResetAt);
+      remaining = Math.max(0, effectiveConfig.activityResetCooldownMs - elapsed);
+      if (remaining === 0) {
+        this.lastAutoActivityResetAt = null;
+      }
+    } else {
+      remaining = 0;
+    }
+
+    this.activityCooldownRemainingMsInternal.set(remaining);
+  }
+
+  private syncLeaderState(): void {
+    if (!this.leaderElection) {
+      return;
+    }
+    const isLeader = this.leaderElection.isLeader();
+    const leaderId = this.leaderElection.leaderId();
+    if (this.leaderState === null) {
+      this.leaderState = isLeader;
+      return;
+    }
+    if (this.leaderState !== isLeader) {
+      this.leaderState = isLeader;
+      this.emitEvent(isLeader ? 'LeaderElected' : 'LeaderLost', { leaderId });
+    }
   }
 
   private updateSnapshot(partial: Partial<SessionSnapshot>): void {
@@ -723,6 +814,7 @@ export class SessionTimeoutService {
       };
       return next;
     });
+    this.refreshDerivedDurations();
     if (!this.isRestoring) {
       persistSnapshot(this.storage, this.configSignal().storageKeyPrefix, this.snapshotSignal());
     }

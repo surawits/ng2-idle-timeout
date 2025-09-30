@@ -152,19 +152,25 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
      imports: [DecimalPipe],
      templateUrl: './session-status.component.html'
    })
-   export class SessionStatusComponent {
-     private readonly sessionTimeout = inject(SessionTimeoutService);
-     protected readonly state = this.sessionTimeout.stateSignal;
-     protected readonly remainingMs = this.sessionTimeout.remainingMsSignal;
-     protected readonly events$ = this.sessionTimeout.events$;
-   }
+    export class SessionStatusComponent {
+      private readonly sessionTimeout = inject(SessionTimeoutService);
+      protected readonly state = this.sessionTimeout.stateSignal;
+      protected readonly idleRemainingMs = this.sessionTimeout.idleRemainingMsSignal;
+      protected readonly countdownRemainingMs = this.sessionTimeout.countdownRemainingMsSignal;
+      protected readonly totalRemainingMs = this.sessionTimeout.totalRemainingMsSignal;
+      protected readonly activityCooldownMs = this.sessionTimeout.activityCooldownRemainingMsSignal;
+      protected readonly events$ = this.sessionTimeout.events$;
+    }
    ```
 
    ```html
    <!-- session-status.component.html -->
    <section class="session-status">
      <p>State: {{ state() }}</p>
-     <p>Time remaining: {{ (remainingMs() / 1000) | number:'1.0-0' }}s</p>
+     <p>Idle window: {{ (idleRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+     <p>Countdown: {{ (countdownRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+     <p>Total remaining: {{ (totalRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+     <p>Activity cooldown: {{ (activityCooldownMs() / 1000) | number:'1.0-0' }}s</p>
      <ng-container *ngIf="(events$ | async) as event">
        <p>Last event: {{ event.type }}</p>
      </ng-container>
@@ -252,7 +258,11 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 | Name | Type | Emits |
 |------|------|-------|
 | `stateSignal` | `Signal<SessionState>` | Current lifecycle state (`IDLE / COUNTDOWN / WARN / EXPIRED`). |
-| `remainingMsSignal` | `Signal<number>` | Milliseconds until expiry, respecting pause/resume. |
+| `idleRemainingMsSignal` | `Signal<number>` | Milliseconds left in the idle grace window (0 outside `IDLE`). |
+| `countdownRemainingMsSignal` | `Signal<number>` | Countdown or warn phase remaining, frozen while paused. |
+| `activityCooldownRemainingMsSignal` | `Signal<number>` | Time until DOM/router activity may auto-reset again. |
+| `totalRemainingMsSignal` | `Signal<number>` | Remaining time in the active phase (idle + countdown). |
+| `remainingMsSignal` | `Signal<number>` | Alias of `totalRemainingMsSignal` for backward compatibility. |
 | `events$` | `Observable<SessionEvent>` | Structured lifecycle events (Started, Warn, Extended, etc.). |
 | `activity$` | `Observable<ActivityEvent>` | Activity resets originating from DOM/router/HTTP/manual triggers. |
 | `crossTab$` | `Observable<CrossTabMessage>` | Broadcast payloads when cross-tab sync is enabled. |
@@ -273,7 +283,7 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 
 ### UI patterns
 
-- Modal warning with a live countdown banner bound to `remainingMsSignal`.
+- Modal warning with a live countdown banner bound to `countdownRemainingMsSignal`.
 - Blocking expiry route using `SessionExpiredGuard` and a focused re-authentication screen.
 - Toast notifications by streaming `events$` through your notification or analytics service.
 
@@ -311,5 +321,3 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 - `npm run demo:test` - sanity-check that the demo compiles in development mode.
 
 MIT licensed - happy idling!
-
-
