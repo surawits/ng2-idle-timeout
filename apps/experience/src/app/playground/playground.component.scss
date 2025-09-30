@@ -139,35 +139,6 @@
   color: var(--text-color-secondary);
 }
 
-.telemetry-streams {
-  border-top: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.08));
-  padding-top: 1rem;
-  margin-bottom: 1.5rem;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.stream-grid {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.stream-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.95rem;
-}
-
-.stream-label {
-  color: var(--text-color-secondary);
-}
-
-.stream-value {
-  font-weight: 600;
-}
-
 .telemetry-target .value {
   font-family: 'JetBrains Mono', monospace;
 }
@@ -189,4 +160,24 @@
 
 .list-card .table td {
   vertical-align: top;
+}
+
+.warn-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  z-index: 1050;
+}
+
+.warn-modal {
+  max-width: min(420px, 100%);
+  border-radius: 1rem;
+}
+
+.warn-modal .card-body {
+  display: grid;
+  gap: 1rem;
 }

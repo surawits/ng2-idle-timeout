@@ -110,14 +110,6 @@ export class PlaygroundComponent {
     return Math.max(0, Math.ceil(this.sessionTimeout.totalRemainingMsSignal() / 1000));
   });
 
-  readonly state$ = this.sessionTimeout.state$;
-  readonly idleRemainingMs$ = this.sessionTimeout.idleRemainingMs$;
-  readonly countdownRemainingMs$ = this.sessionTimeout.countdownRemainingMs$;
-  readonly totalRemainingMs$ = this.sessionTimeout.totalRemainingMs$;
-  readonly activityCooldownRemainingMs$ = this.sessionTimeout.activityCooldownRemainingMs$;
-  readonly isWarn$ = this.sessionTimeout.isWarn$;
-  readonly isExpired$ = this.sessionTimeout.isExpired$;
-
   readonly warningModalCountdownSeconds = computed(() => {
     if (!this.isSessionActive()) {
       return 0;
@@ -304,6 +296,17 @@ export class PlaygroundComponent {
       return;
     }
     this.sessionTimeout.extend({ source: 'playground' });
+  }
+
+  staySignedIn(): void {
+    this.resetIdle('manual');
+  }
+
+  expireSession(): void {
+    if (!this.serviceActive()) {
+      return;
+    }
+    this.sessionTimeout.expireNow({ source: 'playgroundModal' });
   }
 
   resetIdle(source: 'dom' | 'http' | 'manual'): void {
