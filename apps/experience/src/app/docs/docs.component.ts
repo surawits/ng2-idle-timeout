@@ -17,7 +17,7 @@ export class DocsComponent {
 
   readonly craftedByLabel = 'Crafted by Codex';
 
-  readonly heroBadges = ['Signals ready', 'Cross-tab safe', 'Server aligned'];
+  readonly heroBadges = ['Signals & streams', 'Cross-tab safe', 'Server aligned'];
 
   readonly sectionNav = [
     { label: 'Overview & Concepts', href: '#overview' },
@@ -28,7 +28,7 @@ export class DocsComponent {
   ];
 
   readonly overviewHighlights = [
-    'Coordinate idle, countdown, warn, and expire flows with Angular signals.',
+    'Coordinate idle, countdown, warn, and expire flows with Angular signals plus observable mirrors.',
     'Synchronise state across tabs with BroadcastChannel, local storage, and leader election.',
     'Remain zoneless-friendly thanks to DOM, router, and HTTP detectors that operate outside NgZone.'
   ];
@@ -116,21 +116,33 @@ import { SessionTimeoutService } from 'ng2-idle-timeout';
 })
 export class SessionStatusComponent {
   private readonly sessionTimeout = inject(SessionTimeoutService);
+
+  // Signals for zone-less change detection or computed view models
   protected readonly state = this.sessionTimeout.stateSignal;
   protected readonly idleRemainingMs = this.sessionTimeout.idleRemainingMsSignal;
   protected readonly countdownRemainingMs = this.sessionTimeout.countdownRemainingMsSignal;
   protected readonly totalRemainingMs = this.sessionTimeout.totalRemainingMsSignal;
   protected readonly activityCooldownMs = this.sessionTimeout.activityCooldownRemainingMsSignal;
+
+  // Observable mirrors for async pipe / RxJS composition
+  protected readonly state$ = this.sessionTimeout.state$;
+  protected readonly totalRemainingMs$ = this.sessionTimeout.totalRemainingMs$;
+  protected readonly isWarn$ = this.sessionTimeout.isWarn$;
+  protected readonly isExpired$ = this.sessionTimeout.isExpired$;
   protected readonly events$ = this.sessionTimeout.events$;
 }`;
 
   readonly sampleTemplateSnippet = `<!-- session-status.component.html -->
 <section class="session-status">
-  <p>State: {{ state() }}</p>
+  <p>State (signal): {{ state() }}</p>
+  <p>State (observable): {{ (state$ | async) }}</p>
   <p>Idle window: {{ (idleRemainingMs() / 1000) | number:'1.0-0' }}s</p>
   <p>Countdown: {{ (countdownRemainingMs() / 1000) | number:'1.0-0' }}s</p>
-  <p>Total remaining: {{ (totalRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+  <p>Total remaining (signal): {{ (totalRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+  <p>Total remaining (observable): {{ (((totalRemainingMs$ | async) ?? 0) / 1000) | number:'1.0-0' }}s</p>
   <p>Activity cooldown: {{ (activityCooldownMs() / 1000) | number:'1.0-0' }}s</p>
+  <p *ngIf="isWarn$ | async">Warn phase active</p>
+  <p *ngIf="isExpired$ | async">Session expired</p>
   <ng-container *ngIf="(events$ | async) as event">
     <p>Last event: {{ event.type }}</p>
   </ng-container>
@@ -173,15 +185,17 @@ export class SessionStatusComponent {
   ];
 
   readonly signalRows = [
-    { name: 'stateSignal', type: 'Signal<SessionState>', description: 'Current lifecycle state (IDLE / COUNTDOWN / WARN / EXPIRED).' },
-    { name: 'idleRemainingMsSignal', type: 'Signal<number>', description: 'Milliseconds left in the idle grace window (0 outside IDLE).' },
-    { name: 'countdownRemainingMsSignal', type: 'Signal<number>', description: 'Countdown or warn phase remaining, frozen while paused.' },
-    { name: 'activityCooldownRemainingMsSignal', type: 'Signal<number>', description: 'Time until DOM/router activity may auto-reset again.' },
-    { name: 'totalRemainingMsSignal', type: 'Signal<number>', description: 'Remaining time in the active phase (idle + countdown).' },
-    { name: 'remainingMsSignal', type: 'Signal<number>', description: 'Alias of `totalRemainingMsSignal` for backward compatibility.' },
-    { name: 'events$', type: 'Observable<SessionEvent>', description: 'Structured lifecycle events (Started, Warn, Extended, etc.).' },
-    { name: 'activity$', type: 'Observable<ActivityEvent>', description: 'Activity resets originating from DOM/router/HTTP/manual triggers.' },
-    { name: 'crossTab$', type: 'Observable<CrossTabMessage>', description: 'Broadcast payloads when cross-tab sync is enabled.' }
+    { signal: 'stateSignal', observable: 'state$', type: 'SessionState', description: 'Current lifecycle state (IDLE / COUNTDOWN / WARN / EXPIRED).' },
+    { signal: 'idleRemainingMsSignal', observable: 'idleRemainingMs$', type: 'number', description: 'Milliseconds left in the idle grace window (0 outside IDLE).' },
+    { signal: 'countdownRemainingMsSignal', observable: 'countdownRemainingMs$', type: 'number', description: 'Countdown or warn phase remaining, frozen while paused.' },
+    { signal: 'activityCooldownRemainingMsSignal', observable: 'activityCooldownRemainingMs$', type: 'number', description: 'Time until DOM/router activity may auto-reset again.' },
+    { signal: 'totalRemainingMsSignal', observable: 'totalRemainingMs$', type: 'number', description: 'Remaining time in the active phase (idle + countdown).' },
+    { signal: 'remainingMsSignal', observable: 'remainingMs$', type: 'number', description: 'Alias of total remaining time for legacy integrations.' },
+    { signal: 'isWarnSignal', observable: 'isWarn$', type: 'boolean', description: 'True when the countdown has entered the warn window.' },
+    { signal: 'isExpiredSignal', observable: 'isExpired$', type: 'boolean', description: 'True after expiry.' },
+    { signal: '–', observable: 'events$', type: 'Observable<SessionEvent>', description: 'Structured lifecycle events (Started, Warn, Extended, etc.).' },
+    { signal: '–', observable: 'activity$', type: 'Observable<ActivityEvent>', description: 'Activity resets originating from DOM/router/HTTP/manual triggers.' },
+    { signal: '–', observable: 'crossTab$', type: 'Observable<CrossTabMessage>', description: 'Broadcast payloads when cross-tab sync is enabled.' }
   ];
 
   readonly tokenRows = [
@@ -189,7 +203,8 @@ export class SessionStatusComponent {
     { name: 'SESSION_TIMEOUT_HOOKS', type: 'InjectionToken<SessionTimeoutHooks>', description: 'Supply `onExpire` / `onActivity` hooks without patching the service.' },
     { name: 'SessionActivityHttpInterceptor', type: 'Angular interceptor', description: 'Auto-reset idle based on HTTP allowlist/header strategies.' },
     { name: 'SessionExpiredGuard', type: 'Angular guard', description: 'Block or redirect routes when a session is expired.' },
-    { name: 'Activity sources', type: 'Injectable services', description: 'DOM, router, and custom sources that feed `resetIdle()` with metadata.' }
+    { name: 'Activity sources', type: 'Injectable services', description: 'DOM, router, and custom sources that feed `resetIdle()` with metadata.' },
+    { name: 'TimeSourceService', type: 'Injectable service', description: 'Expose `offset` / `offset$` to monitor and adjust server time drift.' }
   ];
 
   readonly eventRows = [
@@ -202,7 +217,7 @@ export class SessionStatusComponent {
   ];
 
   readonly uiPatterns = [
-    { title: 'Modal warning with banner', description: 'Display a modal in WARN while keeping a slim countdown banner bound to `countdownRemainingMsSignal`.' },
+    { title: 'Modal warning with banner', description: 'Display a modal in WARN while keeping a slim countdown banner bound to `countdownRemainingMsSignal` (or `countdownRemainingMs$` via `async`).' },
     { title: 'Blocking expiry route', description: 'Use `SessionExpiredGuard` and a dedicated route to guide users through re-authentication.' },
     { title: 'Toast notifications', description: 'Stream `events$` through your notification service to alert on WARN, EXTENDED, and EXPIRED.' }
   ];

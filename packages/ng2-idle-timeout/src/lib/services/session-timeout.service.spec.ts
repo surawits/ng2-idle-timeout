@@ -1,6 +1,8 @@
 import { EnvironmentInjector } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { TestBed, fakeAsync, flushMicrotasks, discardPeriodicTasks } from '@angular/core/testing';
 import { Subject } from 'rxjs';
+import type { Observable } from 'rxjs';
 
 import type { ActivityEvent } from '../models/activity-event';
 import type { SessionSnapshot } from '../models/session-state';
@@ -166,6 +168,11 @@ describe('SessionTimeoutService', () => {
 
   function cooldownRemaining(): number {
     return service.activityCooldownRemainingMsSignal();
+  }
+
+  function advanceAndTick(ms: number): void {
+    time.advance(ms);
+    manualTick();
   }
 
   it('starts in IDLE and enters countdown after idle grace period', () => {
@@ -347,6 +354,101 @@ describe('SessionTimeoutService', () => {
     expect(totalRemaining()).toBe(1600);
     expect(cooldownRemaining()).toBe(0);
   });
+
+  it('keeps remaining time observables in sync with signals', fakeAsync(() => {
+    service.setConfig({ activityResetCooldownMs: 1000 });
+    flushMicrotasks();
+
+    const idle$: Observable<number> = service.idleRemainingMs$;
+    const countdown$: Observable<number> = service.countdownRemainingMs$;
+    const total$: Observable<number> = service.totalRemainingMs$;
+    const cooldown$: Observable<number> = service.activityCooldownRemainingMs$;
+
+    const idleFrom$ = injector.runInContext(() =>
+      toSignal(idle$, { initialValue: service.idleRemainingMsSignal() })
+    );
+    const countdownFrom$ = injector.runInContext(() =>
+      toSignal(countdown$, { initialValue: service.countdownRemainingMsSignal() })
+    );
+    const totalFrom$ = injector.runInContext(() =>
+      toSignal(total$, { initialValue: service.totalRemainingMsSignal() })
+    );
+    const cooldownFrom$ = injector.runInContext(() =>
+      toSignal(cooldown$, { initialValue: service.activityCooldownRemainingMsSignal() })
+    );
+
+    const assertParity = () => {
+      expect(idleFrom$()).toBe(service.idleRemainingMsSignal());
+      expect(countdownFrom$()).toBe(service.countdownRemainingMsSignal());
+      expect(totalFrom$()).toBe(service.totalRemainingMsSignal());
+      expect(cooldownFrom$()).toBe(service.activityCooldownRemainingMsSignal());
+    };
+
+    assertParity();
+
+    service.start();
+    flushMicrotasks();
+    assertParity();
+
+    advanceAndTick(100);
+    flushMicrotasks();
+    assertParity();
+
+    domService.emit({ type: 'click' });
+    flushMicrotasks();
+    assertParity();
+
+    advanceAndTick(500);
+    flushMicrotasks();
+    assertParity();
+
+    advanceAndTick(600);
+    flushMicrotasks();
+    assertParity();
+
+    service.stop();
+    flushMicrotasks();
+    discardPeriodicTasks();
+  }));
+
+  it('syncs warn and expired observables with their signal counterparts', fakeAsync(() => {
+    const warn$: Observable<boolean> = service.isWarn$;
+    const expired$: Observable<boolean> = service.isExpired$;
+
+    const warnFrom$ = injector.runInContext(() =>
+      toSignal(warn$, { initialValue: service.isWarnSignal() })
+    );
+    const expiredFrom$ = injector.runInContext(() =>
+      toSignal(expired$, { initialValue: service.isExpiredSignal() })
+    );
+
+    const assertParity = () => {
+      expect(warnFrom$()).toBe(service.isWarnSignal());
+      expect(expiredFrom$()).toBe(service.isExpiredSignal());
+    };
+
+    assertParity();
+
+    service.start();
+    flushMicrotasks();
+    assertParity();
+
+    advanceAndTick(baseConfig.idleGraceMs + 1);
+    flushMicrotasks();
+    assertParity();
+
+    advanceAndTick(baseConfig.countdownMs - baseConfig.warnBeforeMs + 1);
+    flushMicrotasks();
+    assertParity();
+
+    advanceAndTick(baseConfig.warnBeforeMs + 5);
+    flushMicrotasks();
+    assertParity();
+
+    service.stop();
+    flushMicrotasks();
+    discardPeriodicTasks();
+  }));
 
   it('throttles DOM activity resets using activityResetCooldownMs', () => {
     service.setConfig({ activityResetCooldownMs: 5000 });

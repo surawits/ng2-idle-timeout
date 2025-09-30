@@ -114,7 +114,7 @@
       <div class="code-block">
         <pre><code>{{ sampleTemplateSnippet }}</code></pre>
       </div>
-      <p class="helper">Expose the signals (e.g. <code>state()</code>, <code>remainingMs()</code>) and optional <code>events$</code> stream in your components after calling <code>start()</code>.</p>
+      <p class="helper">Expose whichever style suits your component: signals (e.g. <code>state()</code>, <code>idleRemainingMs()</code>) or their mirrored streams (e.g. <code>state$</code>, <code>idleRemainingMs$</code>) plus <code>events$</code> after calling <code>start()</code>.</p>
       <p class="helper">Spin up the docs and playground with <code>npm run demo:start</code> at <code>http://localhost:4200</code> to validate scenarios end-to-end.</p>
     </div>
   </article>
@@ -176,19 +176,22 @@
       <table class="table table-sm signal-table">
         <thead>
           <tr>
-            <th>Name</th>
+            <th>Signal</th>
+            <th>Observable</th>
             <th>Type</th>
             <th>Emits</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let signal of signalRows">
-            <th scope="row">{{ signal.name }}</th>
+            <th scope="row">{{ signal.signal }}</th>
+            <td><code>{{ signal.observable }}</code></td>
             <td><code>{{ signal.type }}</code></td>
             <td>{{ signal.description }}</td>
           </tr>
         </tbody>
       </table>
+      <p class="helper"><code>remainingMs$</code> reuses <code>totalRemainingMs$</code> under the hood so legacy consumers keep working without duplicate emissions.</p>
 
       <h3 class="section-heading">Tokens, hooks, supporting providers</h3>
       <table class="table table-sm token-table">

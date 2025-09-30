@@ -254,6 +254,33 @@
         <span class="badge" [attr.class]="'badge ' + sessionBadgeClass()">{{ visibleSessionState() }}</span>
       </div>
 
+      <div class="telemetry-streams">
+        <h6 class="text-uppercase text-muted small mb-2">Observable mirrors</h6>
+        <div class="stream-grid">
+          <div class="stream-row">
+            <span class="stream-label">state$</span>
+            <span class="stream-value">{{ state$ | async }}</span>
+          </div>
+          <div class="stream-row">
+            <span class="stream-label">totalRemainingMs$</span>
+            <span class="stream-value">{{ (((totalRemainingMs$ | async) ?? 0) / 1000) | number:'1.0-0' }} s</span>
+          </div>
+          <div class="stream-row">
+            <span class="stream-label">idleRemainingMs$</span>
+            <span class="stream-value">{{ (((idleRemainingMs$ | async) ?? 0) / 1000) | number:'1.0-0' }} s</span>
+          </div>
+          <div class="stream-row">
+            <span class="stream-label">warn?</span>
+            <span class="stream-value">{{ (isWarn$ | async) ? 'Yes' : 'No' }}</span>
+          </div>
+          <div class="stream-row">
+            <span class="stream-label">expired?</span>
+            <span class="stream-value">{{ (isExpired$ | async) ? 'Yes' : 'No' }}</span>
+          </div>
+        </div>
+        <small class="text-muted">Signals and streams stay in lockstep, so you can wire whichever fits your component.</small>
+      </div>
+
       <div class="telemetry-target d-flex justify-content-between align-items-baseline gap-3 py-2 border-top pt-3">
         <span class="label fw-semibold text-secondary">Warning starts</span>
         <span class="value">

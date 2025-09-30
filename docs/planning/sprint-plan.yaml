@@ -27,7 +27,7 @@ items:
   - id: wrap
     title: Run verification, update progress log, summarize results
     owner: codex
-    status: In Progress
+    status: Done
     dependencies:
       - tests
       - docs

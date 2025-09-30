@@ -144,40 +144,54 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
    // session-status.component.ts
    import { Component, inject } from '@angular/core';
    import { DecimalPipe } from '@angular/common';
-   import { SessionTimeoutService } from 'ng2-idle-timeout';
+  import { SessionTimeoutService } from 'ng2-idle-timeout';
 
-   @Component({
-     selector: 'app-session-status',
-     standalone: true,
-     imports: [DecimalPipe],
-     templateUrl: './session-status.component.html'
-   })
-    export class SessionStatusComponent {
-      private readonly sessionTimeout = inject(SessionTimeoutService);
-      protected readonly state = this.sessionTimeout.stateSignal;
-      protected readonly idleRemainingMs = this.sessionTimeout.idleRemainingMsSignal;
-      protected readonly countdownRemainingMs = this.sessionTimeout.countdownRemainingMsSignal;
-      protected readonly totalRemainingMs = this.sessionTimeout.totalRemainingMsSignal;
-      protected readonly activityCooldownMs = this.sessionTimeout.activityCooldownRemainingMsSignal;
-      protected readonly events$ = this.sessionTimeout.events$;
-    }
-   ```
+  @Component({
+    selector: 'app-session-status',
+    standalone: true,
+    imports: [DecimalPipe],
+    templateUrl: './session-status.component.html'
+  })
+  export class SessionStatusComponent {
+    private readonly sessionTimeout = inject(SessionTimeoutService);
 
-   ```html
-   <!-- session-status.component.html -->
-   <section class="session-status">
-     <p>State: {{ state() }}</p>
-     <p>Idle window: {{ (idleRemainingMs() / 1000) | number:'1.0-0' }}s</p>
-     <p>Countdown: {{ (countdownRemainingMs() / 1000) | number:'1.0-0' }}s</p>
-     <p>Total remaining: {{ (totalRemainingMs() / 1000) | number:'1.0-0' }}s</p>
-     <p>Activity cooldown: {{ (activityCooldownMs() / 1000) | number:'1.0-0' }}s</p>
-     <ng-container *ngIf="(events$ | async) as event">
-       <p>Last event: {{ event.type }}</p>
-     </ng-container>
-   </section>
-   ```
+    // Signals for zone-less change detection or computed view models
+    protected readonly state = this.sessionTimeout.stateSignal;
+    protected readonly idleRemainingMs = this.sessionTimeout.idleRemainingMsSignal;
+    protected readonly countdownRemainingMs = this.sessionTimeout.countdownRemainingMsSignal;
+    protected readonly totalRemainingMs = this.sessionTimeout.totalRemainingMsSignal;
+    protected readonly activityCooldownMs = this.sessionTimeout.activityCooldownRemainingMsSignal;
 
-   Call `sessionTimeout.start()` once (as shown above) before relying on the signals; they emit immediately after bootstrap.
+    // Observable mirrors for async pipe / RxJS composition
+    protected readonly state$ = this.sessionTimeout.state$;
+    protected readonly totalRemainingMs$ = this.sessionTimeout.totalRemainingMs$;
+    protected readonly isWarn$ = this.sessionTimeout.isWarn$;
+    protected readonly isExpired$ = this.sessionTimeout.isExpired$;
+    protected readonly events$ = this.sessionTimeout.events$;
+  }
+  ```
+
+  ```html
+  <!-- session-status.component.html -->
+  <section class="session-status">
+    <p>State (signal): {{ state() }}</p>
+    <p>State (observable): {{ (state$ | async) }}</p>
+    <p>Idle window: {{ (idleRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+    <p>Countdown: {{ (countdownRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+    <p>Total remaining (signal): {{ (totalRemainingMs() / 1000) | number:'1.0-0' }}s</p>
+    <p>Total remaining (observable): {{ (((totalRemainingMs$ | async) ?? 0) / 1000) | number:'1.0-0' }}s</p>
+    <p>Activity cooldown: {{ (activityCooldownMs() / 1000) | number:'1.0-0' }}s</p>
+    <p *ngIf="isWarn$ | async">Warn phase active</p>
+    <p *ngIf="isExpired$ | async">Session expired</p>
+    <ng-container *ngIf="(events$ | async) as event">
+      <p>Last event: {{ event.type }}</p>
+    </ng-container>
+  </section>
+  ```
+
+  Call `sessionTimeout.start()` once (as shown above) before relying on the signals; they emit immediately after bootstrap.
+
+  Every public signal on `SessionTimeoutService` has a matching `...$` observable that emits the same values in lockstep, so you can switch between signals and RxJS without custom bridges.
 
 6. **Explore the demo**
 
@@ -255,17 +269,21 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 
 ### Signals and streams
 
-| Name | Type | Emits |
-|------|------|-------|
-| `stateSignal` | `Signal<SessionState>` | Current lifecycle state (`IDLE / COUNTDOWN / WARN / EXPIRED`). |
-| `idleRemainingMsSignal` | `Signal<number>` | Milliseconds left in the idle grace window (0 outside `IDLE`). |
-| `countdownRemainingMsSignal` | `Signal<number>` | Countdown or warn phase remaining, frozen while paused. |
-| `activityCooldownRemainingMsSignal` | `Signal<number>` | Time until DOM/router activity may auto-reset again. |
-| `totalRemainingMsSignal` | `Signal<number>` | Remaining time in the active phase (idle + countdown). |
-| `remainingMsSignal` | `Signal<number>` | Alias of `totalRemainingMsSignal` for backward compatibility. |
-| `events$` | `Observable<SessionEvent>` | Structured lifecycle events (Started, Warn, Extended, etc.). |
-| `activity$` | `Observable<ActivityEvent>` | Activity resets originating from DOM/router/HTTP/manual triggers. |
-| `crossTab$` | `Observable<CrossTabMessage>` | Broadcast payloads when cross-tab sync is enabled. |
+| Signal | Observable | Type | Emits |
+|--------|------------|------|-------|
+| `stateSignal` | `state$` | `SessionState` | Current lifecycle state (`IDLE / COUNTDOWN / WARN / EXPIRED`). |
+| `idleRemainingMsSignal` | `idleRemainingMs$` | `number` | Milliseconds left in the idle grace window (0 outside `IDLE`). |
+| `countdownRemainingMsSignal` | `countdownRemainingMs$` | `number` | Countdown or warn phase remaining, frozen while paused. |
+| `activityCooldownRemainingMsSignal` | `activityCooldownRemainingMs$` | `number` | Time until DOM/router activity may auto-reset again. |
+| `totalRemainingMsSignal` | `totalRemainingMs$` | `number` | Remaining time in the active phase (idle + countdown). |
+| `remainingMsSignal` | `remainingMs$` | `number` | Alias of total remaining time for legacy integrations. |
+| `isWarnSignal` | `isWarn$` | `boolean` | `true` when the countdown has entered the warn window. |
+| `isExpiredSignal` | `isExpired$` | `boolean` | `true` after expiry. |
+| – | `events$` | `Observable<SessionEvent>` | Structured lifecycle events (Started, Warn, Extended, etc.). |
+| – | `activity$` | `Observable<ActivityEvent>` | Activity resets originating from DOM/router/HTTP/manual triggers. |
+| – | `crossTab$` | `Observable<CrossTabMessage>` | Broadcast payloads when cross-tab sync is enabled. |
+
+`remainingMs$` is the same stream instance as `totalRemainingMs$`, preserving backwards compatibility while avoiding duplicate emissions.
 
 ### Tokens and supporting providers
 
@@ -276,6 +294,7 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 | `SessionActivityHttpInterceptor` | Angular interceptor | Auto-reset idle based on HTTP allowlist/header strategies. |
 | `SessionExpiredGuard` | Angular guard | Block or redirect routes when a session is expired. |
 | Activity sources (DOM, router, custom) | Injectable services | Feed `resetIdle()` with metadata about where activity came from. |
+| `TimeSourceService` | Injectable service | Exposes `offset`/`offset$` so you can monitor and reset server time offsets. |
 
 ---
 
@@ -283,7 +302,7 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 
 ### UI patterns
 
-- Modal warning with a live countdown banner bound to `countdownRemainingMsSignal`.
+- Modal warning with a live countdown banner bound to `countdownRemainingMsSignal` (or `countdownRemainingMs$` with `async`).
 - Blocking expiry route using `SessionExpiredGuard` and a focused re-authentication screen.
 - Toast notifications by streaming `events$` through your notification or analytics service.
 

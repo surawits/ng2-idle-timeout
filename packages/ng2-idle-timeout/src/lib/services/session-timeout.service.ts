@@ -122,8 +122,14 @@ export class SessionTimeoutService {
   private readonly lastActivitySignal: Signal<number | null> = computed(() => this.snapshotSignal().lastActivityAt);
   private readonly countdownEndAtSignal: Signal<number | null> = computed(() => this.snapshotSignal().countdownEndAt);
 
+  readonly idleRemainingMs$ = toObservable(this.idleRemainingMsSignal);
+  readonly activityCooldownRemainingMs$ = toObservable(this.activityCooldownRemainingMsSignal);
+  readonly countdownRemainingMs$ = toObservable(this.countdownRemainingMsSignal);
+  readonly totalRemainingMs$ = toObservable(this.totalRemainingMsSignal);
   readonly state$ = toObservable(this.stateSignal);
-  readonly remainingMs$ = toObservable(this.remainingMsSignal);
+  readonly remainingMs$ = this.totalRemainingMs$;
+  readonly isWarn$ = toObservable(this.isWarnSignal);
+  readonly isExpired$ = toObservable(this.isExpiredSignal);
   readonly lastActivityAt$ = toObservable(this.lastActivitySignal);
   readonly countdownEndAt$ = toObservable(this.countdownEndAtSignal);
   readonly events$ = this.eventsSubject.asObservable();
