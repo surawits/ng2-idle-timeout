@@ -622,7 +622,8 @@ export class SessionTimeoutService {
     const initialConfig = this.configSignal();
     const persistedConfig = readPersistedConfig(this.storage, initialConfig.storageKeyPrefix);
     if (persistedConfig) {
-      const { config, issues } = validateConfig(persistedConfig);
+      const mergedConfig = this.mergePersistedConfigWithProvided(persistedConfig);
+      const { config, issues } = validateConfig(mergedConfig);
       if (issues.length > 0) {
         issues.forEach(issue => this.logger.warn('Persisted config issue: ' + issue.field + ' - ' + issue.message));
       }
@@ -636,6 +637,25 @@ export class SessionTimeoutService {
     if (snapshotData) {
       this.applyPersistedSnapshot(snapshotData);
     }
+  }
+
+  private mergePersistedConfigWithProvided(persisted: SessionTimeoutConfig): SessionTimeoutPartialConfig {
+    if (!this.providedConfig) {
+      return persisted;
+    }
+    const { httpActivity, actionDelays, ...shallow } = this.providedConfig;
+    return {
+      ...persisted,
+      ...shallow,
+      httpActivity: {
+        ...persisted.httpActivity,
+        ...(httpActivity ?? {})
+      },
+      actionDelays: {
+        ...persisted.actionDelays,
+        ...(actionDelays ?? {})
+      }
+    };
   }
 
   private applyPersistedSnapshot(persisted: PersistedSnapshot): void {
@@ -771,7 +791,6 @@ export class SessionTimeoutService {
     }
   }
 }
-
 
 
 
