@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 
 import type { SessionSnapshot, SessionState } from '../models/session-state';
-import type { SessionActionDelays, SessionTimeoutConfig } from '../models/session-timeout-config';
+import type { SessionActionDelays, SessionTimeoutConfig, DomActivityEventName } from '../models/session-timeout-config';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 
 export interface StorageAdapter {
@@ -39,6 +39,7 @@ interface SerializedConfig {
   actionDelays?: Partial<SessionActionDelays>;
   openNewTabBehavior: SessionTimeoutConfig['openNewTabBehavior'];
   routerCountsAsActivity: boolean;
+  domActivityEvents?: DomActivityEventName[];
   debounceMouseMs: number;
   debounceKeyMs: number;
   maxExtendPerSession: number;
@@ -173,6 +174,7 @@ function serializeConfig(config: SessionTimeoutConfig): SerializedConfig {
     actionDelays: { ...config.actionDelays },
     openNewTabBehavior: config.openNewTabBehavior,
     routerCountsAsActivity: config.routerCountsAsActivity,
+    domActivityEvents: [...config.domActivityEvents],
     debounceMouseMs: config.debounceMouseMs,
     debounceKeyMs: config.debounceKeyMs,
     maxExtendPerSession: config.maxExtendPerSession,
@@ -223,6 +225,7 @@ function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
     actionDelays: mergedDelays,
     openNewTabBehavior: serialized.openNewTabBehavior,
     routerCountsAsActivity: serialized.routerCountsAsActivity,
+    domActivityEvents: [...(serialized.domActivityEvents ?? DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents)],
     debounceMouseMs: serialized.debounceMouseMs,
     debounceKeyMs: serialized.debounceKeyMs,
     maxExtendPerSession: serialized.maxExtendPerSession,
@@ -258,4 +261,8 @@ function reviveRegExp(serialized: { source: string; flags: string }): RegExp {
     return new RegExp(serialized.source);
   }
 }
+
+
+
+
 

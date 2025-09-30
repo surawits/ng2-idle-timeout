@@ -192,6 +192,7 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
 | `countdownMs`             | `300000` | Time window for the user to extend or acknowledge before expiry. |
 | `warnBeforeMs`            | `60000`  | Threshold inside the countdown when WARN state triggers. |
 | `activityResetCooldownMs` | `5000`   | Minimum gap between automatic resets triggered by DOM/router noise. |
+| `domActivityEvents`       | `[ 'mousedown', 'click', 'wheel', 'scroll', 'keydown', 'keyup', 'touchstart', 'touchend', 'visibilitychange' ]` | DOM events that reset idle; add `mousemove`/`touchmove` when you explicitly want high-frequency sources. |
 | `resumeBehavior`          | `'manual'` | `'manual'` or `'autoOnServerSync'` for post-expiry recovery. |
 | `storageKeyPrefix`        | `'session'` | Namespacing prefix for persisted config and snapshots. |
 | `httpActivity.strategy`   | `'none'` | HTTP auto reset mode (`allowlist`, `headerFlag`, or `none`). |
@@ -211,7 +212,21 @@ Idle            Countdown            Warn              Expired
 
 - **Call centre**: long idle (10 min), short warn (30 s), manual resume.
 - **Banking**: short idle (2 min), tight warn (15 s), resume only after server sync.
-- **Kiosk**: idle disabled, countdown only, auto resume when the POS heartbeat returns.
+- **Kiosk**: idle disabled, countdown only, auto resume when the POS heartbeat returns.\n\n### DOM activity include list
+
+`domActivityEvents` controls which DOM events count as user activity. The default set listens for clicks, wheel/scroll, key presses, touch start/end, and `visibilitychange` while leaving high-frequency sources such as `mousemove` and `touchmove` disabled to avoid noise. Add or remove events at bootstrap or at runtime:
+
+```ts
+import { DEFAULT_DOM_ACTIVITY_EVENTS } from 'ng2-idle-timeout';
+
+sessionTimeoutService.setConfig({
+  domActivityEvents: [...DEFAULT_DOM_ACTIVITY_EVENTS, 'mousemove']
+});
+```
+
+Calling `setConfig` applies the change immediately, so you can toggle listeners when opening immersive flows (video, games) without restarting the countdown logic.
+
+
 
 ---
 
@@ -296,3 +311,5 @@ Idle            Countdown            Warn              Expired
 - `npm run demo:test` - sanity-check that the demo compiles in development mode.
 
 MIT licensed - happy idling!
+
+

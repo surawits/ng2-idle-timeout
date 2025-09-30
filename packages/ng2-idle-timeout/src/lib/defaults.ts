@@ -1,4 +1,4 @@
-import type { SessionActionDelays, SessionTimeoutConfig } from './models/session-timeout-config';
+import type { SessionActionDelays, SessionTimeoutConfig, DomActivityEventName } from './models/session-timeout-config';
 
 export const DEFAULT_HTTP_ACTIVITY = Object.freeze({
   enabled: true,
@@ -21,6 +21,18 @@ export const DEFAULT_ACTION_DELAYS = Object.freeze({
   expire: 0
 } satisfies SessionActionDelays);
 
+export const DEFAULT_DOM_ACTIVITY_EVENTS = Object.freeze([
+  'mousedown',
+  'click',
+  'wheel',
+  'scroll',
+  'keydown',
+  'keyup',
+  'touchstart',
+  'touchend',
+  'visibilitychange'
+] as const satisfies readonly DomActivityEventName[]);
+
 export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   idleGraceMs: 120_000,
   countdownMs: 3_600_000,
@@ -39,6 +51,7 @@ export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   },
   openNewTabBehavior: 'inherit',
   routerCountsAsActivity: true,
+  domActivityEvents: DEFAULT_DOM_ACTIVITY_EVENTS,
   debounceMouseMs: 800,
   debounceKeyMs: 200,
   maxExtendPerSession: 0,
@@ -58,10 +71,13 @@ export const DEFAULT_STORAGE_KEYS = Object.freeze({
 
 export function mergeConfig(partial: Partial<SessionTimeoutConfig> | undefined): SessionTimeoutConfig {
   if (!partial) {
-    return { ...DEFAULT_SESSION_TIMEOUT_CONFIG };
+    return {
+      ...DEFAULT_SESSION_TIMEOUT_CONFIG,
+      domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
+    };
   }
 
-  const { httpActivity, actionDelays, ...shallow } = partial;
+  const { httpActivity, actionDelays, domActivityEvents, ...shallow } = partial;
 
   const mergedHttp = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity,
@@ -81,7 +97,10 @@ export function mergeConfig(partial: Partial<SessionTimeoutConfig> | undefined):
       allowlist: mergedHttp.allowlist ?? [],
       denylist: mergedHttp.denylist ?? []
     },
-    actionDelays: mergedDelays
+    actionDelays: mergedDelays,
+    domActivityEvents: Array.isArray(domActivityEvents)
+      ? [...domActivityEvents]
+      : [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
   };
 
   return next;

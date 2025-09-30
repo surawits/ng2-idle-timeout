@@ -1,6 +1,7 @@
-﻿import { TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { LeaderElectionService } from './leader-election.service';
 
@@ -39,6 +40,7 @@ describe('LeaderElectionService', () => {
     },
     openNewTabBehavior: 'inherit',
     routerCountsAsActivity: true,
+    domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
     debounceMouseMs: 800,
     debounceKeyMs: 200,
     maxExtendPerSession: 0,
@@ -140,3 +142,4 @@ describe('LeaderElectionService', () => {
     expect(service.leaderId()).toBe('remote-tab');
   });
 });
+

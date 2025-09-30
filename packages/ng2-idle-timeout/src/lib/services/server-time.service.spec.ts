@@ -1,4 +1,4 @@
-﻿import { HttpClient } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { NgZone } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { ServerTimeService } from './server-time.service';
 import { TimeSourceService } from './time-source.service';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 
 const baseConfig: SessionTimeoutConfig = {
   idleGraceMs: 200,
@@ -37,6 +38,7 @@ const baseConfig: SessionTimeoutConfig = {
   },
   openNewTabBehavior: 'inherit',
   routerCountsAsActivity: true,
+  domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
   debounceMouseMs: 800,
   debounceKeyMs: 200,
   maxExtendPerSession: 0,
@@ -172,4 +174,5 @@ describe('ServerTimeService', () => {
     expect(timeSource.resetOffset).toHaveBeenCalled();
   });
 });
+
 

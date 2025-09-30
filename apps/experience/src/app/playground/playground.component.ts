@@ -2,7 +2,7 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { SessionTimeoutService } from 'ng2-idle-timeout';
+import { SessionTimeoutService, DOM_ACTIVITY_EVENT_NAMES, DEFAULT_SESSION_TIMEOUT_CONFIG, type DomActivityEventName } from 'ng2-idle-timeout';
 
 interface EventView {
   type: string;
@@ -28,9 +28,7 @@ interface ActivityView {
   styleUrl: './playground.component.scss'
 })
 export class PlaygroundComponent {
-  private readonly sessionTimeout = inject(SessionTimeoutService);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly router = inject(Router);
+  private readonly sessionTimeout = inject(SessionTimeoutService);\r\n  private readonly destroyRef = inject(DestroyRef);\r\n  private readonly router = inject(Router);\r\n  private readonly initialConfig = this.sessionTimeout.getConfig();\r\n\r\n  readonly domEventOptions = DOM_ACTIVITY_EVENT_NAMES;\r\n  readonly defaultDomEventSelection = new Set<DomActivityEventName>(DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents);\r\n  domEventSelection = new Set<DomActivityEventName>(this.initialConfig.domActivityEvents);
 
   idleGraceSeconds = 60;
   countdownSeconds = 300;
@@ -50,7 +48,7 @@ export class PlaygroundComponent {
 
   private readonly serviceActive = signal(false);
 
-  private readonly configState = signal(this.sessionTimeout.getConfig());
+  private readonly configState = signal(this.initialConfig);
   private readonly renderNow = signal(Date.now());
   private renderTimerHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -192,18 +190,54 @@ export class PlaygroundComponent {
     });
   }
 
-  applyConfig(): void {
-    this.sessionTimeout.setConfig({
-      idleGraceMs: this.idleGraceSeconds * 1000,
-      countdownMs: this.countdownSeconds * 1000,
-      warnBeforeMs: this.warnBeforeSeconds * 1000,
-      activityResetCooldownMs: this.activityCooldownSeconds * 1000,
-      resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual'
-    });
-    this.configState.set(this.sessionTimeout.getConfig());
-    if (!this.serviceActive()) {
-      this.sessionTimeout.stop();
+  applyConfig(): void {\r\n    const domActivityEvents = this.currentDomActivityEvents();\r\n    this.sessionTimeout.setConfig({\r\n      idleGraceMs: this.idleGraceSeconds * 1000,\r\n      countdownMs: this.countdownSeconds * 1000,\r\n      warnBeforeMs: this.warnBeforeSeconds * 1000,\r\n      activityResetCooldownMs: this.activityCooldownSeconds * 1000,\r\n      resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',\r\n      domActivityEvents\r\n    });\r\n    const nextConfig = this.sessionTimeout.getConfig();\r\n    this.configState.set(nextConfig);\r\n    this.domEventSelection = new Set<DomActivityEventName>(nextConfig.domActivityEvents);\r\n    if (!this.serviceActive()) {\r\n      this.sessionTimeout.stop();\r\n    }\r\n  }\r\n\r\n  isDomEventSelected(event: DomActivityEventName): boolean {
+    return this.domEventSelection.has(event);
+  }
+
+  toggleDomEvent(event: DomActivityEventName, enabled: boolean): void {
+    if (enabled) {
+      this.domEventSelection.add(event);
+    } else {
+      this.domEventSelection.delete(event);
     }
+    this.applyConfig();
+  }
+
+  domEventLabel(event: DomActivityEventName): string {
+    switch (event) {
+      case 'mousemove':
+        return 'Mouse move';
+      case 'mousedown':
+        return 'Mouse down';
+      case 'click':
+        return 'Click';
+      case 'wheel':
+        return 'Wheel';
+      case 'scroll':
+        return 'Scroll';
+      case 'keydown':
+        return 'Key down';
+      case 'keyup':
+        return 'Key up';
+      case 'touchstart':
+        return 'Touch start';
+      case 'touchend':
+        return 'Touch end';
+      case 'touchmove':
+        return 'Touch move';
+      case 'visibilitychange':
+        return 'Visibility change';
+      default:
+        return event;
+    }
+  }
+
+  isDefaultDomEvent(event: DomActivityEventName): boolean {
+    return this.defaultDomEventSelection.has(event);
+  }
+
+  private currentDomActivityEvents(): DomActivityEventName[] {
+    return this.domEventOptions.filter(option => this.domEventSelection.has(option));
   }
 
   start(): void {
@@ -350,3 +384,8 @@ export class PlaygroundComponent {
     };
   }
 }
+
+
+
+
+

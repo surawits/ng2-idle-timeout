@@ -2,6 +2,22 @@ import type { ActivityEvent } from './activity-event';
 
 export type SessionTimeoutStrategy = 'userOnly' | 'userAndHttpAllowlist' | 'aggressive';
 
+export const DOM_ACTIVITY_EVENT_NAMES = [
+  'mousemove',
+  'mousedown',
+  'click',
+  'wheel',
+  'scroll',
+  'keydown',
+  'keyup',
+  'touchstart',
+  'touchend',
+  'touchmove',
+  'visibilitychange'
+] as const;
+
+export type DomActivityEventName = (typeof DOM_ACTIVITY_EVENT_NAMES)[number];
+
 export interface HttpActivityPolicyConfig {
   enabled: boolean;
   strategy: 'allowlist' | 'headerFlag' | 'aggressive';
@@ -38,6 +54,7 @@ export interface SessionTimeoutConfig {
   actionDelays: SessionActionDelays;
   openNewTabBehavior: 'inherit';
   routerCountsAsActivity: boolean;
+  domActivityEvents: readonly DomActivityEventName[];
   debounceMouseMs: number;
   debounceKeyMs: number;
   maxExtendPerSession: number;

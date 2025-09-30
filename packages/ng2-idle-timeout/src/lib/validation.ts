@@ -1,5 +1,10 @@
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from './defaults';
-import type { SessionTimeoutConfig, SessionTimeoutPartialConfig } from './models/session-timeout-config';
+import {
+  DOM_ACTIVITY_EVENT_NAMES,
+  type DomActivityEventName,
+  type SessionTimeoutConfig,
+  type SessionTimeoutPartialConfig
+} from './models/session-timeout-config';
 
 export interface ValidationIssue {
   field: string;
@@ -11,9 +16,11 @@ export interface ValidationResult {
   config: SessionTimeoutConfig;
 }
 
+const DOM_ACTIVITY_EVENT_SET = new Set<string>(DOM_ACTIVITY_EVENT_NAMES);
+
 export function validateConfig(partial: SessionTimeoutPartialConfig | undefined): ValidationResult {
   const issues: ValidationIssue[] = [];
-  const config = normalizeConfig(partial);
+  const { config, invalidDomActivityEvents } = normalizeConfig(partial);
 
   if (config.idleGraceMs <= 0) {
     issues.push(createIssue('idleGraceMs', 'Value must be greater than 0'));
@@ -39,8 +46,12 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
   if (config.timeSource === 'server' && !config.serverTimeEndpoint) {
     issues.push(createIssue('serverTimeEndpoint', 'Required when timeSource is server'));
   }
-  if (typeof config.onExpire === 'string' && config.onExpire.startsWith('navigate:') && config.onExpire.split(':').length < 2) {
-    issues.push(createIssue('onExpire', 'navigate: form requires target path')); // Fallback guard
+  if (
+    typeof config.onExpire === 'string' &&
+    config.onExpire.startsWith('navigate:') &&
+    config.onExpire.split(':').length < 2
+  ) {
+    issues.push(createIssue('onExpire', 'navigate: form requires target path'));
   }
 
   for (const [key, value] of Object.entries(config.actionDelays)) {
@@ -49,14 +60,31 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
     }
   }
 
+  if (invalidDomActivityEvents.length > 0) {
+    issues.push(
+      createIssue(
+        'domActivityEvents',
+        `Unsupported DOM events: ${invalidDomActivityEvents.join(', ')}`
+      )
+    );
+  }
+
   return { issues, config };
 }
 
-function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): SessionTimeoutConfig {
-  const base = { ...DEFAULT_SESSION_TIMEOUT_CONFIG };
-  const { httpActivity, actionDelays, ...shallow } = partial ?? {};
+interface NormalizedConfigResult {
+  config: SessionTimeoutConfig;
+  invalidDomActivityEvents: string[];
+}
 
-  const merged = {
+function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): NormalizedConfigResult {
+  const base: SessionTimeoutConfig = {
+    ...DEFAULT_SESSION_TIMEOUT_CONFIG,
+    domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
+  };
+  const { httpActivity, actionDelays, domActivityEvents, ...shallow } = partial ?? {};
+
+  const merged: SessionTimeoutConfig = {
     ...base,
     ...shallow,
     httpActivity: {
@@ -66,13 +94,35 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Sess
     actionDelays: {
       ...base.actionDelays,
       ...(actionDelays ?? {})
-    }
+    },
+    domActivityEvents: base.domActivityEvents
   };
+
+  const invalidDomActivityEvents: string[] = [];
+
+  if (Array.isArray(domActivityEvents)) {
+    const deduped: DomActivityEventName[] = [];
+    const seen = new Set<string>();
+    for (const raw of domActivityEvents) {
+      const candidate = String(raw);
+      if (!DOM_ACTIVITY_EVENT_SET.has(candidate)) {
+        invalidDomActivityEvents.push(candidate);
+        continue;
+      }
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        deduped.push(candidate as DomActivityEventName);
+      }
+    }
+    merged.domActivityEvents = deduped;
+  } else {
+    merged.domActivityEvents = [...base.domActivityEvents];
+  }
 
   merged.httpActivity.allowlist = [...(merged.httpActivity.allowlist ?? [])];
   merged.httpActivity.denylist = [...(merged.httpActivity.denylist ?? [])];
 
-  return merged;
+  return { config: merged, invalidDomActivityEvents };
 }
 
 function createIssue(field: string, message: string): ValidationIssue {

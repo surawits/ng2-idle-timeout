@@ -1,10 +1,11 @@
-﻿import { EnvironmentInjector } from '@angular/core';
+import { EnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Subject } from 'rxjs';
 
 import type { ActivityEvent } from '../models/activity-event';
 import type { SessionSnapshot } from '../models/session-state';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
 import { TimeSourceService } from './time-source.service';
@@ -105,6 +106,7 @@ describe('SessionTimeoutService', () => {
     },
     openNewTabBehavior: 'inherit',
     routerCountsAsActivity: true,
+    domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
     debounceMouseMs: 800,
     debounceKeyMs: 200,
     maxExtendPerSession: 0,
@@ -337,6 +339,8 @@ describe('SessionTimeoutService', () => {
     }
   });
 });
+
+
 
 
 

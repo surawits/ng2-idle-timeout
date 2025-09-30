@@ -1,4 +1,4 @@
-﻿import { HttpContext, HttpHeaders, HttpRequest as AngularHttpRequest } from '@angular/common/http';
+import { HttpContext, HttpHeaders, HttpRequest as AngularHttpRequest } from '@angular/common/http';
 import type { HttpEvent, HttpHandler, HttpRequest } from '@angular/common/http';
 import { of } from 'rxjs';
 
@@ -7,6 +7,7 @@ import { getSessionActivityContextToken } from './session-activity-http.context'
 import { LeaderElectionService } from '../services/leader-election.service';
 import { SessionTimeoutService } from '../services/session-timeout.service';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 
 class MockHttpHandler implements HttpHandler {
   handle = jest.fn(() => of({} as HttpEvent<unknown>));
@@ -51,6 +52,7 @@ describe('SessionActivityHttpInterceptor', () => {
     },
     openNewTabBehavior: 'inherit',
     routerCountsAsActivity: true,
+    domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
     debounceMouseMs: 800,
     debounceKeyMs: 200,
     maxExtendPerSession: 0,
@@ -265,3 +267,4 @@ describe('SessionActivityHttpInterceptor', () => {
     );
   });
 });
+

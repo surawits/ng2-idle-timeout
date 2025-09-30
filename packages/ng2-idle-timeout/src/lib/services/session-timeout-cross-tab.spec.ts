@@ -1,6 +1,7 @@
-﻿import { TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import type { SessionSnapshot } from '../models/session-state';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import type { CrossTabMessage } from '../models/cross-tab-message';
 import type { BroadcastAdapter } from '../utils/broadcast-channel';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
@@ -105,6 +106,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
     },
     openNewTabBehavior: 'inherit',
     routerCountsAsActivity: true,
+    domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
     debounceMouseMs: 800,
     debounceKeyMs: 200,
     maxExtendPerSession: 0,
@@ -263,6 +265,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
     sub.unsubscribe();
   });
 });
+
 
 
 
