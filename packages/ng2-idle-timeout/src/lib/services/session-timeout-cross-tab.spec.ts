@@ -264,4 +264,49 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     sub.unsubscribe();
   });
+
+  it('sends reset message when follower has activity', () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    jest.spyOn(leader, 'isLeader').mockReturnValue(false); // This tab is a follower
+
+    const channel = broadcastMock.__getChannel(channelName);
+    expect(channel).toBeDefined();
+    const postMessageSpy = jest.spyOn(channel!, 'publish');
+
+    service.start();
+    // Simulate a DOM activity event
+    (service as any).handleExternalActivity({ source: 'dom', at: time.now() }, 'ResetByActivity');
+
+    expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'reset' }));
+  });
+
+  it('leader resets idle timer on reset message from follower', () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    jest.spyOn(leader, 'isLeader').mockReturnValue(true); // This tab is the leader
+
+    service.start();
+    time.advance(100);
+    manualTick();
+    const idleStartBefore = snapshot().idleStartAt;
+
+    const channel = broadcastMock.__getChannel(channelName);
+    expect(channel).toBeDefined();
+
+    time.advance(50);
+    const activityTime = time.now();
+
+    // Simulate receiving a reset message from a follower
+    channel!.emit({
+      sourceId: 'remote-tab',
+      type: 'reset',
+      at: activityTime,
+      payload: { activitySource: 'dom' }
+    } satisfies CrossTabMessage);
+
+    manualTick();
+
+    const idleStartAfter = snapshot().idleStartAt;
+    expect(idleStartAfter).toBeGreaterThan(idleStartBefore!);
+    expect(idleStartAfter).toBe(activityTime);
+  });
 });

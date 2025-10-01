@@ -329,7 +329,7 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 
 - **Docs & playground**: `npm run demo:start` (Angular 18 experience app at http://localhost:4200).
 - **Release notes**: see `RELEASE_NOTES.md` for breaking changes and upgrade hints.
-- **Support & issues**: open tickets at https://github.com/ng2-idle-timeout/ng2-idle-timeout.
+- **Support & issues**: open tickets at https://github.com/ng2-idle-timeout.
 
 **Maintainer scripts**
 

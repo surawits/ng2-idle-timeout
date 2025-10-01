@@ -22,7 +22,7 @@ export class AppComponent {
     { label: 'Documentation', routerLink: '/docs' },
     { label: 'Playground', routerLink: '/playground' },
     { label: 'FAQ', routerLink: '/faq' },
-    { label: 'GitHub', externalUrl: 'https://github.com/ng2-idle-timeout/ng2-idle-timeout', target: '_blank' }
+    { label: 'GitHub', externalUrl: 'https://github.com/ng2-idle-timeout', target: '_blank' }
   ];
 
   isMenuOpen = false;

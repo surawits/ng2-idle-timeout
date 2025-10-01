@@ -243,6 +243,10 @@ export class SessionTimeoutService {
     const metaWithSource = { ...(meta ?? {}), activitySource: source };
     this.emitActivity(source, metaWithSource);
     this.executeWithDelay('resetIdle', () => {
+      if (this.leaderElection?.isLeader() === false) {
+        this.broadcastCrossTab('reset', { activitySource: source });
+        return;
+      }
       this.resetIdleInternal('ResetByActivity', metaWithSource);
     });
   }
@@ -459,6 +463,10 @@ export class SessionTimeoutService {
     this.lastAutoActivityResetAt = now;
     this.refreshActivityCooldownRemaining(now, config);
     this.executeWithDelay('resetIdle', () => {
+      if (this.leaderElection?.isLeader() === false) {
+        this.broadcastCrossTab('reset', { activitySource: activity.source });
+        return;
+      }
       this.resetIdleInternal(eventType, meta);
     });
   }
@@ -569,6 +577,9 @@ export class SessionTimeoutService {
         case 'sync':
           this.applyCrossTabSync(message);
           break;
+        case 'reset':
+          this.applyCrossTabReset(message);
+          break;
         default:
           this.logger.warn('Unknown cross-tab message type', message);
       }
@@ -619,6 +630,11 @@ export class SessionTimeoutService {
       reason: message.payload?.reason
     });
     void this.runExpireHooks();
+  }
+
+  private applyCrossTabReset(message: CrossTabMessage): void {
+    const source = message.payload?.activitySource ?? 'cross-tab';
+    this.resetIdleInternal('ResetByActivity', { crossTab: true, sourceTabId: message.sourceId, activitySource: source });
   }
 
   private applyCrossTabSync(message: CrossTabMessage): void {
