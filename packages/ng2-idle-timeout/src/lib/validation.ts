@@ -3,7 +3,8 @@ import {
   DOM_ACTIVITY_EVENT_NAMES,
   type DomActivityEventName,
   type SessionTimeoutConfig,
-  type SessionTimeoutPartialConfig
+  type SessionTimeoutPartialConfig,
+  type SessionSyncMode
 } from './models/session-timeout-config';
 
 export interface ValidationIssue {
@@ -45,6 +46,9 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
   }
   if (config.timeSource === 'server' && !config.serverTimeEndpoint) {
     issues.push(createIssue('serverTimeEndpoint', 'Required when timeSource is server'));
+  }
+  if (!isValidSyncMode(config.syncMode)) {
+    issues.push(createIssue('syncMode', 'Must be either "leader" or "distributed"'));
   }
   if (
     typeof config.onExpire === 'string' &&
@@ -127,4 +131,8 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Norm
 
 function createIssue(field: string, message: string): ValidationIssue {
   return { field, message };
+}
+
+function isValidSyncMode(mode: SessionTimeoutConfig['syncMode']): mode is SessionSyncMode {
+  return mode === 'leader' || mode === 'distributed';
 }

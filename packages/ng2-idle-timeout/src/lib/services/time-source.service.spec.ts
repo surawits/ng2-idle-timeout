@@ -1,11 +1,20 @@
 import { EnvironmentInjector } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TestBed, fakeAsync, flushMicrotasks } from '@angular/core/testing';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import type { Observable } from 'rxjs';
 
 import { TimeSourceService } from './time-source.service';
 
 describe('TimeSourceService', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let service: TimeSourceService;
   let injector: EnvironmentInjector;
 

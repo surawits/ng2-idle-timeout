@@ -1,6 +1,7 @@
 import { EnvironmentInjector } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TestBed, fakeAsync, flushMicrotasks, discardPeriodicTasks } from '@angular/core/testing';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { Subject } from 'rxjs';
 import type { Observable } from 'rxjs';
 
@@ -72,6 +73,14 @@ class StubServerTimeService {
 }
 
 describe('SessionTimeoutService', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let injector: EnvironmentInjector;
   let service: SessionTimeoutService;
   let time: MockTimeSourceService;
@@ -86,6 +95,7 @@ describe('SessionTimeoutService', () => {
     activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
+    syncMode: 'leader',
     strategy: 'userOnly',
     httpActivity: {
       enabled: false,

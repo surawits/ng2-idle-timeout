@@ -6,6 +6,7 @@ export interface SessionSnapshot {
   warnBeforeMs: number;
   countdownMs: number;
   idleGraceMs: number;
+  startedAt: number | null;
   idleStartAt: number | null;
   countdownEndAt: number | null;
   lastActivityAt: number | null;

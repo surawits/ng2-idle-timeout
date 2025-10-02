@@ -13,12 +13,14 @@ export interface StorageAdapter {
 
 export interface PersistedSnapshot {
   state: SessionState;
+  startedAt: number | null;
   idleStartAt: number | null;
   countdownEndAt: number | null;
   lastActivityAt: number | null;
   remainingMs: number;
   paused: boolean;
   updatedAt: number;
+  version: number;
 }
 
 export interface PersistedConfig {
@@ -34,6 +36,7 @@ interface SerializedConfig {
   pollingMs: number;
   activityResetCooldownMs?: number;
   storageKeyPrefix: string;
+  syncMode: SessionTimeoutConfig['syncMode'];
   strategy: SessionTimeoutConfig['strategy'];
   httpActivity: SerializedHttpConfig;
   actionDelays?: Partial<SessionActionDelays>;
@@ -93,16 +96,24 @@ function createNoopStorage(): StorageAdapter {
   };
 }
 
-export function persistSnapshot(adapter: StorageAdapter, prefix: string, snapshot: SessionSnapshot): void {
+export function persistSnapshot(
+  adapter: StorageAdapter,
+  prefix: string,
+  snapshot: SessionSnapshot,
+  version: number,
+  updatedAt: number
+): void {
   try {
     const payload: PersistedSnapshot = {
       state: snapshot.state,
+      startedAt: snapshot.startedAt,
       idleStartAt: snapshot.idleStartAt,
       countdownEndAt: snapshot.countdownEndAt,
       lastActivityAt: snapshot.lastActivityAt,
       remainingMs: snapshot.remainingMs,
       paused: snapshot.paused,
-      updatedAt: Date.now()
+      updatedAt,
+      version
     };
     adapter.write(`${prefix}:snapshot`, JSON.stringify(payload));
   } catch (error) {
@@ -169,6 +180,7 @@ function serializeConfig(config: SessionTimeoutConfig): SerializedConfig {
     pollingMs: config.pollingMs,
     activityResetCooldownMs: config.activityResetCooldownMs,
     storageKeyPrefix: config.storageKeyPrefix,
+    syncMode: config.syncMode,
     strategy: config.strategy,
     httpActivity: serializeHttpConfig(config.httpActivity),
     actionDelays: { ...config.actionDelays },
@@ -220,6 +232,7 @@ function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
     activityResetCooldownMs: serialized.activityResetCooldownMs ?? DEFAULT_SESSION_TIMEOUT_CONFIG.activityResetCooldownMs,
     storageKeyPrefix: serialized.storageKeyPrefix,
     appInstanceId: undefined,
+    syncMode: serialized.syncMode ?? DEFAULT_SESSION_TIMEOUT_CONFIG.syncMode,
     strategy: serialized.strategy,
     httpActivity: deserializeHttpConfig(serialized.httpActivity),
     actionDelays: mergedDelays,

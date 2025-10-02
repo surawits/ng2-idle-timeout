@@ -1,9 +1,12 @@
+import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import type { SessionSnapshot } from '../models/session-state';
-import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
-import type { CrossTabMessage } from '../models/cross-tab-message';
-import type { BroadcastAdapter } from '../utils/broadcast-channel';
+
+type SessionSnapshot = import('../models/session-state').SessionSnapshot;
+type SessionTimeoutConfig = import('../models/session-timeout-config').SessionTimeoutConfig;
+type CrossTabMessage = import('../models/cross-tab-message').CrossTabMessage;
+type BroadcastAdapter = import('../utils/broadcast-channel').BroadcastAdapter;
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
 import { LeaderElectionService } from './leader-election.service';
@@ -72,10 +75,37 @@ class MockTimeSourceService {
   }
 }
 
+class StubLeaderElectionService {
+  private readonly leaderInternal = signal<string | null>('stub-leader');
+  readonly leaderId = this.leaderInternal.asReadonly();
+  readonly isLeader = computed(() => this.leaderInternal() != null);
+
+  updateConfig(): void {}
+
+  electLeader(): void {}
+
+  stepDown(): void {
+    this.setLeader(false);
+  }
+
+  setLeader(value: boolean, id: string | null = value ? 'stub-leader' : null): void {
+    this.leaderInternal.set(value ? id : null);
+  }
+}
+
 describe('SessionTimeoutService cross-tab sync', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let service: SessionTimeoutService;
   let time: MockTimeSourceService;
   let broadcastMock: BroadcastMockModule;
+  let leaderStub: StubLeaderElectionService;
   const baseConfig: SessionTimeoutConfig = {
     idleGraceMs: 200,
     countdownMs: 1000,
@@ -84,6 +114,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
     activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
+    syncMode: 'leader',
     strategy: 'userOnly',
     httpActivity: {
       enabled: false,
@@ -118,19 +149,20 @@ describe('SessionTimeoutService cross-tab sync', () => {
     allowManualExtendWhenExpired: false
   };
   const channelName = 'testApp:test:session-timeout';
-  const leaderKey = 'testApp:test:leader';
-  const HEARTBEAT_INTERVAL_MS = 1500;
 
   beforeEach(() => {
     broadcastMock = jest.requireMock('../utils/broadcast-channel') as BroadcastMockModule;
     broadcastMock.__resetChannels();
+
+    leaderStub = new StubLeaderElectionService();
 
     TestBed.configureTestingModule({
       providers: [
         SessionTimeoutService,
         { provide: TimeSourceService, useClass: MockTimeSourceService },
         { provide: SESSION_TIMEOUT_CONFIG, useValue: baseConfig },
-        { provide: ServerTimeService, useValue: { configure: jest.fn(), stop: jest.fn() } }
+        { provide: ServerTimeService, useValue: { configure: jest.fn(), stop: jest.fn() } },
+        { provide: LeaderElectionService, useValue: leaderStub }
       ]
     });
 
@@ -159,15 +191,20 @@ describe('SessionTimeoutService cross-tab sync', () => {
     service.start();
     service.extend();
 
-    expect(messages).toHaveLength(1);
-    const extendMessage = messages[0];
+    const extendMessages = messages.filter(message => message.type === 'extend');
+    expect(extendMessages).toHaveLength(1);
+    const extendMessage = extendMessages[0];
     expect(extendMessage.type).toBe('extend');
     expect(typeof extendMessage.sourceId).toBe('string');
     expect(extendMessage.payload?.snapshot?.state).toBe('COUNTDOWN');
+    expect(extendMessage.payload?.snapshot?.startedAt).not.toBeNull();
+    expect(extendMessage.payload?.version).toBeGreaterThan(0);
+    expect(extendMessage.payload?.updatedAt).toBeGreaterThanOrEqual(0);
   });
 
   it('applies remote extend snapshot into local state', () => {
     service.start();
+    leaderStub.setLeader(false);
 
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
@@ -177,7 +214,8 @@ describe('SessionTimeoutService cross-tab sync', () => {
       state: 'COUNTDOWN',
       countdownEndAt: time.now() + 1500,
       remainingMs: 1500,
-      paused: false
+      paused: false,
+      startedAt: snapshot().startedAt ?? time.now()
     };
 
     const events: string[] = [];
@@ -187,17 +225,19 @@ describe('SessionTimeoutService cross-tab sync', () => {
       sourceId: 'remote-tab',
       type: 'extend',
       at: time.now(),
-      payload: { snapshot: remoteSnapshot }
+      payload: { snapshot: remoteSnapshot, version: 10, updatedAt: time.now() + 5 }
     } satisfies CrossTabMessage);
 
     const current = snapshot();
     expect(current.state).toBe('COUNTDOWN');
     expect(current.remainingMs).toBe(remoteSnapshot.remainingMs);
+    expect(current.startedAt).toBe(remoteSnapshot.startedAt);
     expect(events).toContain('Extended');
   });
 
   it('forces local expiration when remote tab expires', () => {
     service.start();
+    leaderStub.setLeader(false);
     time.advance(baseConfig.idleGraceMs + baseConfig.countdownMs);
     manualTick();
 
@@ -221,8 +261,11 @@ describe('SessionTimeoutService cross-tab sync', () => {
           state: 'EXPIRED',
           remainingMs: 0,
           countdownEndAt: time.now(),
-          paused: false
-        }
+          paused: false,
+          startedAt: snapshot().startedAt
+        },
+        version: 20,
+        updatedAt: time.now() + 5
       }
     } satisfies CrossTabMessage);
 
@@ -231,43 +274,30 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(current.remainingMs).toBe(0);
     expect(expireEvents.length).toBeGreaterThanOrEqual(1);
   });
-  it('emits leader election events on leadership changes', async () => {
+  it('emits leader election events on leadership changes', () => {
     const captured: Array<{ type: string; meta?: Record<string, unknown> }> = [];
     const sub = service.events$.subscribe(event => {
       captured.push({ type: event.type, meta: event.meta as Record<string, unknown> | undefined });
     });
-    const leader = TestBed.inject(LeaderElectionService);
 
     service.start();
 
-    leader.stepDown();
-    expect(leader.isLeader()).toBe(false);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    leaderStub.setLeader(false, null);
+    (service as any).syncLeaderState?.();
+    leaderStub.setLeader(true, 'new-leader');
+    (service as any).syncLeaderState?.();
 
-    const remoteRecord = { id: 'remote-tab', updatedAt: Date.now() };
-    localStorage.setItem(leaderKey, JSON.stringify(remoteRecord));
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: leaderKey,
-      newValue: JSON.stringify(remoteRecord),
-      storageArea: localStorage
-    }));
-    const staleRecord = { id: 'remote-tab', updatedAt: Date.now() - HEARTBEAT_INTERVAL_MS * 4 };
-    localStorage.setItem(leaderKey, JSON.stringify(staleRecord));
-    leader.updateConfig(baseConfig);
-    await new Promise(resolve => setTimeout(resolve, HEARTBEAT_INTERVAL_MS));
-
+    const leaderLost = captured.find(event => event.type === 'LeaderLost');
     const leaderEvent = captured.find(event => event.type === 'LeaderElected');
-    expect(leader.isLeader()).toBe(true);
-    if (leaderEvent) {
-      expect(leaderEvent.meta?.leaderId).toBeDefined();
-    }
+    expect(leaderLost).toBeDefined();
+    expect(leaderEvent).toBeDefined();
+    expect(leaderEvent?.meta?.leaderId).toBe('new-leader');
 
     sub.unsubscribe();
   });
 
   it('sends reset message when follower has activity', () => {
-    const leader = TestBed.inject(LeaderElectionService);
-    jest.spyOn(leader, 'isLeader').mockReturnValue(false); // This tab is a follower
+    leaderStub.setLeader(false);
 
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
@@ -281,8 +311,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
   });
 
   it('leader resets idle timer on reset message from follower', () => {
-    const leader = TestBed.inject(LeaderElectionService);
-    jest.spyOn(leader, 'isLeader').mockReturnValue(true); // This tab is the leader
+    leaderStub.setLeader(true);
 
     service.start();
     time.advance(100);

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { Subject } from 'rxjs';
 import { Router } from '@angular/router';
 import type { Event as RouterEvent } from '@angular/router';
@@ -11,6 +12,14 @@ class StubRouter {
 }
 
 describe('ActivityRouterService', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let service: ActivityRouterService;
   let stubRouter: StubRouter;
 

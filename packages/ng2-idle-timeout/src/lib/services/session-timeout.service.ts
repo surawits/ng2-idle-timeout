@@ -38,6 +38,8 @@ type ServerTimeListenerApi = {
   unregisterSyncListener?: (listener: () => void) => void;
 };
 
+const CLOCK_SKEW_TOLERANCE_MS = 2_000;
+
 type ActionDelayKey = keyof SessionActionDelays;
 
 function generateTabId(): string {
@@ -79,6 +81,7 @@ export class SessionTimeoutService {
     warnBeforeMs: this.configSignal().warnBeforeMs,
     countdownMs: this.configSignal().countdownMs,
     idleGraceMs: this.configSignal().idleGraceMs,
+    startedAt: null,
     idleStartAt: null,
     countdownEndAt: null,
     lastActivityAt: null,
@@ -109,6 +112,8 @@ export class SessionTimeoutService {
   private readonly countdownRemainingMsInternal = signal(0);
   private readonly totalRemainingMsInternal = signal(0);
   private readonly activityCooldownRemainingMsInternal = signal(0);
+  private snapshotVersion = 0;
+  private lastPersistedSnapshotAt = 0;
 
   readonly idleRemainingMsSignal = this.idleRemainingMsInternal.asReadonly();
   readonly activityCooldownRemainingMsSignal = this.activityCooldownRemainingMsInternal.asReadonly();
@@ -215,6 +220,7 @@ export class SessionTimeoutService {
       const timestamp = this.timeSource.now();
       this.updateSnapshot({
         state: 'IDLE',
+        startedAt: timestamp,
         idleStartAt: timestamp,
         countdownEndAt: null,
         lastActivityAt: timestamp,
@@ -229,6 +235,7 @@ export class SessionTimeoutService {
     this.executeWithDelay('stop', () => {
       this.updateSnapshot({
         state: 'IDLE',
+        startedAt: null,
         idleStartAt: null,
         countdownEndAt: null,
         remainingMs: this.configSignal().countdownMs,
@@ -265,7 +272,7 @@ export class SessionTimeoutService {
         paused: false
       });
       this.emitEvent('Extended', meta);
-      this.broadcastCrossTab('extend', { snapshot: { ...this.snapshotSignal() } });
+      this.broadcastCrossTab('extend', this.createSharedSnapshotPayload());
     });
   }
 
@@ -273,6 +280,7 @@ export class SessionTimeoutService {
     const timestamp = this.timeSource.now();
     this.updateSnapshot({
       state: 'IDLE',
+      startedAt: this.snapshotSignal().startedAt ?? timestamp,
       idleStartAt: timestamp,
       countdownEndAt: null,
       lastActivityAt: timestamp,
@@ -293,7 +301,10 @@ export class SessionTimeoutService {
       });
       this.emitEvent('Expired', reason);
       void this.runExpireHooks();
-      this.broadcastCrossTab('expire', { snapshot: { ...this.snapshotSignal() }, reason });
+      this.broadcastCrossTab('expire', {
+        ...this.createSharedSnapshotPayload(),
+        reason
+      });
     });
   }
 
@@ -381,6 +392,11 @@ export class SessionTimeoutService {
     const timestamp = this.timeSource.now();
     this.refreshActivityCooldownRemaining(timestamp, config);
 
+    if (config.syncMode === 'leader' && this.leaderElection && !this.leaderElection.isLeader()) {
+      this.refreshDerivedDurations(timestamp, config);
+      return;
+    }
+
     const snapshot = this.snapshotSignal();
 
     if (snapshot.paused || snapshot.state === 'EXPIRED') {
@@ -417,7 +433,7 @@ export class SessionTimeoutService {
     if (remaining === 0) {
       this.updateSnapshot({ state: 'EXPIRED', remainingMs: 0 });
       this.emitEvent('Expired');
-      this.broadcastCrossTab('expire', { snapshot: { ...this.snapshotSignal() } });
+      this.broadcastCrossTab('expire', this.createSharedSnapshotPayload());
       void this.runExpireHooks();
       return;
     }
@@ -523,6 +539,14 @@ export class SessionTimeoutService {
     this.crossTabSubject.next(message);
   }
 
+  private createSharedSnapshotPayload(): CrossTabMessage['payload'] {
+    return {
+      snapshot: { ...this.snapshotSignal() },
+      version: this.snapshotVersion,
+      updatedAt: this.lastPersistedSnapshotAt
+    };
+  }
+
   private executeWithDelay(action: ActionDelayKey, work: () => void): void {
     const delay = Math.max(0, this.configSignal().actionDelays[action] ?? 0);
     if (delay <= 0) {
@@ -590,24 +614,41 @@ export class SessionTimeoutService {
 
   private applyCrossTabExtend(message: CrossTabMessage): void {
     const snapshot = message.payload?.snapshot;
+    const version = message.payload?.version;
+    const updatedAt = message.payload?.updatedAt;
+
     if (snapshot) {
-      this.updateSnapshot({
-        state: snapshot.state,
-        idleStartAt: snapshot.idleStartAt,
-        countdownEndAt: snapshot.countdownEndAt,
-        lastActivityAt: snapshot.lastActivityAt,
-        remainingMs: snapshot.remainingMs,
-        paused: snapshot.paused
-      });
+      if (!this.shouldAcceptRemoteSnapshot(version, updatedAt)) {
+        return;
+      }
+      const options = {
+        suppressBroadcast: true,
+        updatedAt,
+        forcePersist: true,
+        ...(version != null ? { versionOverride: version } : {})
+      };
+      this.updateSnapshot(
+        {
+          state: snapshot.state,
+          startedAt: snapshot.startedAt,
+          idleStartAt: snapshot.idleStartAt,
+          countdownEndAt: snapshot.countdownEndAt,
+          lastActivityAt: snapshot.lastActivityAt,
+          remainingMs: snapshot.remainingMs,
+          paused: snapshot.paused
+        },
+        options
+      );
     } else {
       const timestamp = this.timeSource.now();
       const countdownEndAt = timestamp + this.configSignal().countdownMs;
       this.updateSnapshot({
         state: 'COUNTDOWN',
+        startedAt: this.snapshotSignal().startedAt ?? timestamp,
         countdownEndAt,
         remainingMs: Math.max(0, countdownEndAt - timestamp),
         paused: false
-      });
+      }, { suppressBroadcast: true });
     }
 
     this.emitEvent('Extended', { crossTab: true, sourceTabId: message.sourceId });
@@ -615,14 +656,31 @@ export class SessionTimeoutService {
 
   private applyCrossTabExpire(message: CrossTabMessage): void {
     const snapshot = message.payload?.snapshot;
+    const version = message.payload?.version;
+    const updatedAt = message.payload?.updatedAt;
     const countdownEndAt = snapshot?.countdownEndAt ?? this.timeSource.now();
 
-    this.updateSnapshot({
-      state: 'EXPIRED',
-      remainingMs: 0,
-      countdownEndAt,
-      paused: false
-    });
+    if (snapshot && !this.shouldAcceptRemoteSnapshot(version, updatedAt)) {
+      return;
+    }
+
+    const options = {
+      suppressBroadcast: true,
+      updatedAt,
+      forcePersist: true,
+      ...(version != null ? { versionOverride: version } : {})
+    };
+
+    this.updateSnapshot(
+      {
+        state: 'EXPIRED',
+        startedAt: snapshot?.startedAt ?? this.snapshotSignal().startedAt,
+        remainingMs: 0,
+        countdownEndAt,
+        paused: false
+      },
+      options
+    );
 
     this.emitEvent('Expired', {
       crossTab: true,
@@ -633,6 +691,9 @@ export class SessionTimeoutService {
   }
 
   private applyCrossTabReset(message: CrossTabMessage): void {
+    if (this.configSignal().syncMode === 'leader' && this.leaderElection && !this.leaderElection.isLeader()) {
+      return;
+    }
     const source = message.payload?.activitySource ?? 'cross-tab';
     this.resetIdleInternal('ResetByActivity', { crossTab: true, sourceTabId: message.sourceId, activitySource: source });
   }
@@ -643,14 +704,31 @@ export class SessionTimeoutService {
       return;
     }
 
-    this.updateSnapshot({
-      state: snapshot.state,
-      idleStartAt: snapshot.idleStartAt,
-      countdownEndAt: snapshot.countdownEndAt,
-      lastActivityAt: snapshot.lastActivityAt,
-      remainingMs: snapshot.remainingMs,
-      paused: snapshot.paused
-    });
+    const version = message.payload?.version;
+    const updatedAt = message.payload?.updatedAt;
+    if (!this.shouldAcceptRemoteSnapshot(version, updatedAt)) {
+      return;
+    }
+
+    const options = {
+      suppressBroadcast: true,
+      updatedAt,
+      forcePersist: true,
+      ...(version != null ? { versionOverride: version } : {})
+    };
+
+    this.updateSnapshot(
+      {
+        state: snapshot.state,
+        startedAt: snapshot.startedAt,
+        idleStartAt: snapshot.idleStartAt,
+        countdownEndAt: snapshot.countdownEndAt,
+        lastActivityAt: snapshot.lastActivityAt,
+        remainingMs: snapshot.remainingMs,
+        paused: snapshot.paused
+      },
+      options
+    );
   }
   private restoreFromStorage(): void {
     const initialConfig = this.configSignal();
@@ -732,6 +810,8 @@ export class SessionTimeoutService {
 
     const inferredCountdownEndAt = countdownEndAt ?? ((state === 'COUNTDOWN' || state === 'WARN') ? now + remainingMs : null);
 
+    this.snapshotVersion = persisted.version ?? this.snapshotVersion;
+    this.lastPersistedSnapshotAt = persisted.updatedAt ?? this.lastPersistedSnapshotAt;
     this.isRestoring = true;
     this.snapshotSignal.set({
       state,
@@ -739,6 +819,7 @@ export class SessionTimeoutService {
       warnBeforeMs: config.warnBeforeMs,
       countdownMs: config.countdownMs,
       idleGraceMs: config.idleGraceMs,
+      startedAt: persisted.startedAt,
       idleStartAt,
       countdownEndAt: inferredCountdownEndAt,
       lastActivityAt: persisted.lastActivityAt,
@@ -825,21 +906,92 @@ export class SessionTimeoutService {
     }
   }
 
-  private updateSnapshot(partial: Partial<SessionSnapshot>): void {
-    this.snapshotSignal.update(previous => {
-      const next: SessionSnapshot = {
-        ...previous,
-        warnBeforeMs: this.configSignal().warnBeforeMs,
-        countdownMs: this.configSignal().countdownMs,
-        idleGraceMs: this.configSignal().idleGraceMs,
-        ...partial
-      };
-      return next;
-    });
-    this.refreshDerivedDurations();
-    if (!this.isRestoring) {
-      persistSnapshot(this.storage, this.configSignal().storageKeyPrefix, this.snapshotSignal());
+  private updateSnapshot(
+    partial: Partial<SessionSnapshot>,
+    options?: {
+      versionOverride?: number;
+      updatedAt?: number;
+      suppressBroadcast?: boolean;
+      forcePersist?: boolean;
     }
+  ): void {
+    const config = this.configSignal();
+    const now = this.timeSource.now();
+    const targetVersion =
+      options?.versionOverride ?? (this.isRestoring ? this.snapshotVersion : this.snapshotVersion + 1);
+
+    this.snapshotSignal.update(previous => ({
+      ...previous,
+      warnBeforeMs: config.warnBeforeMs,
+      countdownMs: config.countdownMs,
+      idleGraceMs: config.idleGraceMs,
+      ...partial
+    }));
+
+    this.snapshotVersion = targetVersion;
+
+    const persistTimestamp = options?.updatedAt ?? now;
+    const shouldPersist = options?.forcePersist ?? !this.isRestoring;
+
+    if (shouldPersist) {
+      persistSnapshot(
+        this.storage,
+        config.storageKeyPrefix,
+        this.snapshotSignal(),
+        this.snapshotVersion,
+        persistTimestamp
+      );
+      this.lastPersistedSnapshotAt = persistTimestamp;
+    } else if (options?.updatedAt != null) {
+      this.lastPersistedSnapshotAt = options.updatedAt;
+    }
+
+    this.refreshDerivedDurations(now, config);
+
+    if (
+      shouldPersist &&
+      !this.isHandlingCrossTabMessage &&
+      !options?.suppressBroadcast &&
+      this.shouldBroadcastSync()
+    ) {
+      this.broadcastCrossTab('sync', this.createSharedSnapshotPayload());
+    }
+  }
+
+  private shouldBroadcastSync(): boolean {
+    if (!this.crossTabChannel) {
+      return false;
+    }
+    const config = this.configSignal();
+    if (config.syncMode === 'leader') {
+      if (!this.leaderElection) {
+        return true;
+      }
+      return this.leaderElection.isLeader();
+    }
+    return true;
+  }
+
+  private shouldAcceptRemoteSnapshot(version?: number, updatedAt?: number): boolean {
+    if (version == null) {
+      return true;
+    }
+    if (version > this.snapshotVersion) {
+      return true;
+    }
+    if (version < this.snapshotVersion) {
+      return false;
+    }
+    if (updatedAt == null) {
+      return false;
+    }
+    if (updatedAt > this.lastPersistedSnapshotAt + CLOCK_SKEW_TOLERANCE_MS) {
+      return true;
+    }
+    if (updatedAt + CLOCK_SKEW_TOLERANCE_MS < this.lastPersistedSnapshotAt) {
+      return false;
+    }
+    return false;
   }
 
   private emitEvent(type: SessionEvent['type'], meta?: Record<string, unknown>): void {

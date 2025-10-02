@@ -28,6 +28,7 @@ describe('SessionActivityHttpInterceptor', () => {
     activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
+    syncMode: 'leader',
     strategy: 'userAndHttpAllowlist',
     httpActivity: {
       enabled: true,

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 
 import { ActivityDomService } from './activity-dom.service';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
@@ -82,6 +83,14 @@ function getDebounceKind(eventName: DomActivityEventName): 'mouse' | 'key' | 'no
 }
 
 describe('ActivityDomService', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let service: ActivityDomService;
   let currentTime: number;
 

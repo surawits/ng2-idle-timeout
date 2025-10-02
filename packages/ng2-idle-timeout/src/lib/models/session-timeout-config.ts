@@ -41,6 +41,8 @@ export interface SessionActionDelays {
   expire: number;
 }
 
+export type SessionSyncMode = 'leader' | 'distributed';
+
 export interface SessionTimeoutConfig {
   idleGraceMs: number;
   countdownMs: number;
@@ -49,6 +51,7 @@ export interface SessionTimeoutConfig {
   activityResetCooldownMs: number;
   storageKeyPrefix: string;
   appInstanceId?: string;
+  syncMode: SessionSyncMode;
   strategy: SessionTimeoutStrategy;
   httpActivity: HttpActivityPolicyConfig;
   actionDelays: SessionActionDelays;

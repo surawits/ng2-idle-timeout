@@ -1,5 +1,6 @@
-﻿import { EnvironmentInjector } from '@angular/core';
+import { EnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 
 import { SessionExpiredGuard, SESSION_TIMEOUT_ROUTE_KEY, type SessionTimeoutRouteConfig } from './session-expired.guard';
@@ -14,6 +15,7 @@ class MockSessionTimeoutService {
     warnBeforeMs: 100,
     countdownMs: 1000,
     idleGraceMs: 200,
+    startedAt: null,
     idleStartAt: null,
     countdownEndAt: null,
     lastActivityAt: null,
@@ -28,6 +30,14 @@ class MockSessionTimeoutService {
 }
 
 describe('SessionExpiredGuard', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let service: MockSessionTimeoutService;
   let injector: EnvironmentInjector;
   let routerState: RouterStateSnapshot;

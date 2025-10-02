@@ -10,5 +10,7 @@ export interface CrossTabMessage {
     snapshot?: SessionSnapshot;
     reason?: unknown;
     activitySource?: string;
+    version?: number;
+    updatedAt?: number;
   };
 }

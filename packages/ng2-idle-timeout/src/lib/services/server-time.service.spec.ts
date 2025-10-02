@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { NgZone } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { of, throwError } from 'rxjs';
 
 import { ServerTimeService } from './server-time.service';
@@ -16,6 +17,7 @@ const baseConfig: SessionTimeoutConfig = {
   activityResetCooldownMs: 0,
   storageKeyPrefix: 'test',
   appInstanceId: 'testApp',
+  syncMode: 'leader',
   strategy: 'userOnly',
   httpActivity: {
     enabled: false,
@@ -51,6 +53,14 @@ const baseConfig: SessionTimeoutConfig = {
 };
 
 describe('ServerTimeService', () => {
+  beforeAll(() => {
+    try {
+      TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting());
+    } catch (error) {
+      // environment may already be initialized in other specs
+    }
+  });
+
   let service: ServerTimeService;
   let httpClient: { get: jest.Mock };
   let timeSource: { setOffset: jest.Mock; resetOffset: jest.Mock };
