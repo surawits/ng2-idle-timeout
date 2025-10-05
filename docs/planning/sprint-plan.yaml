@@ -10,7 +10,7 @@ items:
 - id: cp2a-config
   title: 2a Config & Validation updates for syncMode
   owner: codex
-  status: Next
+  status: Done
   notes: defaults, validation schema, unit tests
   dependencies:
   - cp1-discovery

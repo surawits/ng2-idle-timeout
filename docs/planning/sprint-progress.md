@@ -7,7 +7,7 @@
 
 ## Work Items
 - cp1-discovery: Done
-- cp2a-config: Next
+- cp2a-config: Done
 - cp2b-coordinator: Next
 - cp2c-messaging: Next
 - cp3a-leader-integration: Next
@@ -22,3 +22,4 @@
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
 - 2025-10-05 22:58 - Completed Checkpoint 1 discovery with design brief, syncMode behaviour matrix, risk & verification outline (`docs/planning/cross-tab-sync-discovery.md`).
+- 2025-10-05 23:09 - Finished CP2a syncMode config/validation updates, updated storage serialization, and added targeted Jest coverage (`npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/validation.spec.ts`).

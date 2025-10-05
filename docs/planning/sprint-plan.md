@@ -18,7 +18,7 @@
   - Deliverables: architectural brief, behaviour matrix for syncMode, risk log, verification outline (`docs/planning/cross-tab-sync-discovery.md`).
 - [ ] Checkpoint 2 – Shared State Foundations
   - Sub-checkpoints:
-    - [ ] 2a Config & Validation updates for syncMode and schema adjustments.
+    - [x] 2a Config & Validation updates for syncMode and schema adjustments (`packages/ng2-idle-timeout/src/lib/validation.ts`).
     - [ ] 2b Shared-state coordinator (storage + broadcast) with unit tests.
     - [ ] 2c Cross-tab messaging contract revisions and baseline tests.
 - [ ] Checkpoint 3 – Leader Mode Rework
