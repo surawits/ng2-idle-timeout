@@ -1,4 +1,86 @@
-goal: No active sprint
-owner: unassigned
-items: []
-updated: 2025-10-05T22:30:12+07:00
+goal: Implement cross-tab sync with selectable leader/distributed modes
+owner: codex
+items:
+  - id: cp1-discovery
+    title: Checkpoint 1 – Discovery & Design Notes
+    owner: codex
+    status: Next
+    notes: architectural brief, syncMode behaviour matrix, risk log, verification outline
+    dependencies: []
+  - id: cp2a-config
+    title: 2a Config & Validation updates for syncMode
+    owner: codex
+    status: Next
+    notes: defaults, validation schema, unit tests
+    dependencies:
+      - cp1-discovery
+  - id: cp2b-coordinator
+    title: 2b Shared-state coordinator implementation
+    owner: codex
+    status: Next
+    notes: storage+broadcast abstraction with tests
+    dependencies:
+      - cp2a-config
+  - id: cp2c-messaging
+    title: 2c Cross-tab messaging contract revisions
+    owner: codex
+    status: Next
+    notes: payload schema, serialization guards, baseline specs
+    dependencies:
+      - cp2b-coordinator
+  - id: cp3a-leader-integration
+    title: 3a Service integration for leader ownership flow
+    owner: codex
+    status: Next
+    notes: SessionTimeoutService wiring to coordinator
+    dependencies:
+      - cp2c-messaging
+  - id: cp3b-leader-lifecycle
+    title: 3b Leader lifecycle & failover handling
+    owner: codex
+    status: Next
+    notes: visibility/unload/sleep handling, leader election updates
+    dependencies:
+      - cp3a-leader-integration
+  - id: cp3c-leader-tests
+    title: 3c Leader-mode regression test suite
+    owner: codex
+    status: Next
+    notes: follower activity propagation, failover specs
+    dependencies:
+      - cp3b-leader-lifecycle
+  - id: cp4a-distributed-rules
+    title: 4a Distributed consensus rules design
+    owner: codex
+    status: Next
+    notes: conflict resolution algorithm, metadata requirements
+    dependencies:
+      - cp3c-leader-tests
+  - id: cp4b-distributed-service
+    title: 4b Distributed reconciliation wiring
+    owner: codex
+    status: Next
+    notes: service implementation for multi-writer consistency
+    dependencies:
+      - cp4a-distributed-rules
+  - id: cp4c-distributed-tests
+    title: 4c Distributed-mode test coverage
+    owner: codex
+    status: Next
+    notes: concurrent activity scenarios, sleep/wake simulations
+    dependencies:
+      - cp4b-distributed-service
+  - id: cp5-playground
+    title: Checkpoint 5 – Playground & Integration Updates
+    owner: codex
+    status: Next
+    notes: multi-tab demo controls, manual validation script
+    dependencies:
+      - cp4c-distributed-tests
+  - id: cp6-docs
+    title: Checkpoint 6 – Documentation, Migration, Verification
+    owner: codex
+    status: Next
+    notes: README, migration notes, release notes, verification log, planning sync
+    dependencies:
+      - cp5-playground
