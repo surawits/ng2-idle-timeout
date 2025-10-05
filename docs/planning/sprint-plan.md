@@ -20,7 +20,7 @@
   - Sub-checkpoints:
     - [x] 2a Config & Validation updates for syncMode and schema adjustments (`packages/ng2-idle-timeout/src/lib/validation.ts`).
     - [x] 2b Shared-state coordinator (storage + broadcast) with unit tests (`packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.ts`).
-    - [ ] 2c Cross-tab messaging contract revisions and baseline tests.
+    - [x] 2c Cross-tab messaging contract revisions and baseline tests (`packages/ng2-idle-timeout/src/lib/models/cross-tab-message.ts`).
 - [ ] Checkpoint 3 – Leader Mode Rework
   - Sub-checkpoints:
     - [ ] 3a Service integration with coordinator for leader ownership flow.

@@ -24,7 +24,7 @@ items:
 - id: cp2c-messaging
   title: 2c Cross-tab messaging contract revisions
   owner: codex
-  status: Next
+  status: Done
   notes: payload schema, serialization guards, baseline specs
   dependencies:
   - cp2b-coordinator

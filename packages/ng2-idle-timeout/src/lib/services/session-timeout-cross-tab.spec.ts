@@ -3,6 +3,7 @@ import type { SessionSnapshot } from '../models/session-state';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import type { CrossTabMessage } from '../models/cross-tab-message';
+import { SHARED_STATE_VERSION, type SharedSessionState } from '../models/session-shared-state';
 import type { BroadcastAdapter } from '../utils/broadcast-channel';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
@@ -153,6 +154,35 @@ describe('SessionTimeoutService cross-tab sync', () => {
     return service.getSnapshot();
   }
 
+  function buildSharedState(overrides?: Partial<SharedSessionState>): SharedSessionState {
+    const now = time.now();
+    return {
+      version: SHARED_STATE_VERSION,
+      updatedAt: overrides?.updatedAt ?? now,
+      syncMode: overrides?.syncMode ?? 'leader',
+      leader: overrides?.leader ?? null,
+      snapshot: overrides?.snapshot ?? {
+        state: 'IDLE',
+        remainingMs: baseConfig.countdownMs,
+        idleStartAt: now,
+        countdownEndAt: now + baseConfig.countdownMs,
+        lastActivityAt: now,
+        paused: false
+      },
+      config: overrides?.config ?? {
+        idleGraceMs: baseConfig.idleGraceMs,
+        countdownMs: baseConfig.countdownMs,
+        warnBeforeMs: baseConfig.warnBeforeMs,
+        activityResetCooldownMs: baseConfig.activityResetCooldownMs,
+        storageKeyPrefix: baseConfig.storageKeyPrefix,
+        syncMode: overrides?.syncMode ?? baseConfig.syncMode,
+        resumeBehavior: baseConfig.resumeBehavior,
+        ignoreUserActivityWhenPaused: baseConfig.ignoreUserActivityWhenPaused,
+        allowManualExtendWhenExpired: baseConfig.allowManualExtendWhenExpired
+      }
+    };
+  }
+
   it('publishes extend messages with snapshot details', () => {
     const messages: CrossTabMessage[] = [];
     service.crossTab$.subscribe(message => messages.push(message));
@@ -160,8 +190,9 @@ describe('SessionTimeoutService cross-tab sync', () => {
     service.start();
     service.extend();
 
-    expect(messages).toHaveLength(1);
-    const extendMessage = messages[0];
+    const extendMessages = messages.filter(message => message.type === 'extend');
+    expect(extendMessages).toHaveLength(1);
+    const extendMessage = extendMessages[0];
     expect(extendMessage.type).toBe('extend');
     expect(typeof extendMessage.sourceId).toBe('string');
     expect(extendMessage.payload?.snapshot?.state).toBe('COUNTDOWN');
@@ -231,6 +262,55 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(current.state).toBe('EXPIRED');
     expect(current.remainingMs).toBe(0);
     expect(expireEvents.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('applies shared session state when sync message includes sharedState payload', () => {
+    service.start();
+    const channel = broadcastMock.__getChannel(channelName);
+    expect(channel).toBeDefined();
+
+    const sharedState = buildSharedState({
+      syncMode: 'distributed',
+      config: {
+        idleGraceMs: 180,
+        countdownMs: 1600,
+        warnBeforeMs: 400,
+        activityResetCooldownMs: 20,
+        storageKeyPrefix: baseConfig.storageKeyPrefix,
+        syncMode: 'distributed',
+        resumeBehavior: 'autoOnServerSync',
+        ignoreUserActivityWhenPaused: true,
+        allowManualExtendWhenExpired: true
+      },
+      snapshot: {
+        state: 'COUNTDOWN',
+        remainingMs: 900,
+        idleStartAt: time.now() - 50,
+        countdownEndAt: time.now() + 900,
+        lastActivityAt: time.now() - 25,
+        paused: false
+      }
+    });
+
+    channel!.emit({
+      sourceId: 'remote-tab',
+      type: 'sync',
+      at: time.now(),
+      payload: { sharedState }
+    } satisfies CrossTabMessage);
+
+    const updatedConfig = service.getConfig();
+    expect(updatedConfig.syncMode).toBe('distributed');
+    expect(updatedConfig.idleGraceMs).toBe(180);
+    expect(updatedConfig.countdownMs).toBe(1600);
+    expect(updatedConfig.warnBeforeMs).toBe(400);
+    expect(updatedConfig.ignoreUserActivityWhenPaused).toBe(true);
+    expect(updatedConfig.allowManualExtendWhenExpired).toBe(true);
+
+    const currentSnapshot = snapshot();
+    expect(currentSnapshot.state).toBe('COUNTDOWN');
+    expect(currentSnapshot.remainingMs).toBe(900);
+    expect(currentSnapshot.countdownEndAt).toBe(sharedState.snapshot.countdownEndAt);
   });
   it('emits leader election events on leadership changes', async () => {
     const captured: Array<{ type: string; meta?: Record<string, unknown> }> = [];
@@ -309,5 +389,32 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const idleStartAfter = snapshot().idleStartAt;
     expect(idleStartAfter).toBeGreaterThan(idleStartBefore!);
     expect(idleStartAfter).toBe(activityTime);
+  });
+
+  it('broadcasts shared state in response to sync requests', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    jest.spyOn(leader, 'isLeader').mockReturnValue(true);
+
+    const messages: CrossTabMessage[] = [];
+    service.crossTab$.subscribe(message => messages.push(message));
+
+    service.start();
+    messages.length = 0;
+
+    const channel = broadcastMock.__getChannel(channelName);
+    expect(channel).toBeDefined();
+
+    channel!.emit({
+      sourceId: 'remote-tab',
+      type: 'sync-request',
+      at: time.now()
+    } satisfies CrossTabMessage);
+
+    await Promise.resolve();
+
+    const syncMessage = messages.find(message => message.type === 'sync');
+    expect(syncMessage).toBeDefined();
+    expect(syncMessage?.payload?.sharedState?.version).toBe(SHARED_STATE_VERSION);
+    expect(syncMessage?.payload?.sharedState?.config.syncMode).toBe('leader');
   });
 });

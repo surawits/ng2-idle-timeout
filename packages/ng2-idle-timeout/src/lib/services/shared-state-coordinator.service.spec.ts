@@ -113,6 +113,7 @@ describe('SharedStateCoordinatorService', () => {
       leader: overrides?.leader ?? null,
       snapshot: overrides?.snapshot ?? {
         state: 'IDLE',
+        remainingMs: 1_000,
         idleStartAt: null,
         countdownEndAt: null,
         lastActivityAt: null,

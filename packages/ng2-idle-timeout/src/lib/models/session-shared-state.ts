@@ -23,6 +23,7 @@ export interface SharedConfigPayload {
 
 export interface SharedSessionSnapshot {
   state: SessionState;
+  remainingMs: number;
   idleStartAt: number | null;
   countdownEndAt: number | null;
   lastActivityAt: number | null;

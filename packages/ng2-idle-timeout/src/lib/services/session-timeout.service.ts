@@ -8,6 +8,7 @@ import type { ActivityEvent } from '../models/activity-event';
 import type { SessionEvent } from '../models/session-event';
 import type { SessionSnapshot, SessionState } from '../models/session-state';
 import type { CrossTabMessage, CrossTabMessageType } from '../models/cross-tab-message';
+import { SHARED_STATE_VERSION, type SharedSessionState } from '../models/session-shared-state';
 import { createBroadcastChannel, type BroadcastAdapter } from '../utils/broadcast-channel';
 import type {
   SessionTimeoutConfig,
@@ -23,6 +24,7 @@ import { validateConfig } from '../validation';
 import { ActivityDomService } from './activity-dom.service';
 import { ActivityRouterService } from './activity-router.service';
 import { LeaderElectionService } from './leader-election.service';
+import { SharedStateCoordinatorService } from './shared-state-coordinator.service';
 import {
   createStorage,
   persistConfig,
@@ -59,6 +61,7 @@ export class SessionTimeoutService {
   private readonly serverTime = inject(ServerTimeService, { optional: true });
   private serverTimeListenerRegistered = false;
   private readonly leaderElection = inject(LeaderElectionService, { optional: true });
+  private readonly sharedStateCoordinator = inject(SharedStateCoordinatorService);
   private leaderState: boolean | null = null;
   private readonly leaderWatcher = this.leaderElection
     ? effect(() => {
@@ -67,6 +70,7 @@ export class SessionTimeoutService {
     : null;
   private readonly storage: StorageAdapter = createStorage();
   private isRestoring = false;
+  private isApplyingSharedState = false;
 
   private configSignal = signal(
     validateConfig(this.providedConfig as SessionTimeoutPartialConfig | undefined).config
@@ -144,6 +148,7 @@ export class SessionTimeoutService {
     this.routerActivity?.updateConfig(config);
     this.serverTime?.configure(config);
     this.leaderElection?.updateConfig(config);
+    this.sharedStateCoordinator.updateConfig(config);
     this.syncLeaderState();
     this.setupCrossTabChannel(config);
     this.refreshDerivedDurations(undefined, config);
@@ -171,6 +176,28 @@ export class SessionTimeoutService {
     this.restoreFromStorage();
     this.refreshDerivedDurations();
     this.refreshActivityCooldownRemaining();
+
+    this.sharedStateCoordinator.updateConfig(this.configSignal());
+
+    const persistedSharedState = this.sharedStateCoordinator.readPersistedState();
+    if (persistedSharedState) {
+      this.applySharedSessionState(persistedSharedState);
+    } else {
+      this.sharedStateCoordinator.requestSync('initial');
+      Promise.resolve().then(() => this.broadcastCrossTab('sync-request'));
+    }
+
+    this.sharedStateCoordinator.updates$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(message => {
+        this.zone.run(() => {
+          if (message.type === 'state') {
+            this.applySharedSessionState(message.state);
+          } else if (message.type === 'request-sync') {
+            this.broadcastSharedState({ crossTab: true });
+          }
+        });
+      });
 
     this.destroyRef.onDestroy(() => {
       this.destroy$.next();
@@ -343,6 +370,9 @@ export class SessionTimeoutService {
     }
     this.emitEvent('ConfigChanged', { issues });
     this.clearAllActionTimers();
+    if (!this.isApplyingSharedState) {
+      this.broadcastSharedState();
+    }
   }
 
   registerOnExpireCallback(callback: (snapshot: SessionSnapshot) => void | Promise<void>): void {
@@ -580,6 +610,9 @@ export class SessionTimeoutService {
         case 'reset':
           this.applyCrossTabReset(message);
           break;
+        case 'sync-request':
+          this.handleSyncRequest(message);
+          break;
         default:
           this.logger.warn('Unknown cross-tab message type', message);
       }
@@ -638,6 +671,11 @@ export class SessionTimeoutService {
   }
 
   private applyCrossTabSync(message: CrossTabMessage): void {
+    const sharedState = message.payload?.sharedState;
+    if (sharedState) {
+      this.applySharedSessionState(sharedState);
+      return;
+    }
     const snapshot = message.payload?.snapshot;
     if (!snapshot) {
       return;
@@ -651,6 +689,112 @@ export class SessionTimeoutService {
       remainingMs: snapshot.remainingMs,
       paused: snapshot.paused
     });
+  }
+
+  private applySharedSessionState(sharedState: SharedSessionState): void {
+    this.isApplyingSharedState = true;
+    try {
+      const configPatch: SessionTimeoutPartialConfig = {
+        idleGraceMs: sharedState.config.idleGraceMs,
+        countdownMs: sharedState.config.countdownMs,
+        warnBeforeMs: sharedState.config.warnBeforeMs,
+        activityResetCooldownMs: sharedState.config.activityResetCooldownMs,
+        storageKeyPrefix: sharedState.config.storageKeyPrefix,
+        syncMode: sharedState.config.syncMode,
+        resumeBehavior: sharedState.config.resumeBehavior,
+        ignoreUserActivityWhenPaused: sharedState.config.ignoreUserActivityWhenPaused,
+        allowManualExtendWhenExpired: sharedState.config.allowManualExtendWhenExpired
+      };
+
+      this.setConfig(configPatch);
+
+      const snapshot = sharedState.snapshot;
+      this.updateSnapshot({
+        state: snapshot.state,
+        idleStartAt: snapshot.idleStartAt,
+        countdownEndAt: snapshot.countdownEndAt,
+        lastActivityAt: snapshot.lastActivityAt,
+        remainingMs: snapshot.remainingMs,
+        paused: snapshot.paused
+      });
+
+      this.sharedStateCoordinator.publishState(sharedState, { persist: true, broadcast: false });
+    } finally {
+      this.isApplyingSharedState = false;
+    }
+  }
+
+  private buildSharedSessionState(): SharedSessionState {
+    const config = this.configSignal();
+    const snapshot = this.snapshotSignal();
+    const now = this.timeSource.now();
+    const leaderId = this.leaderElection?.leaderId?.();
+    const leaderInfo =
+      config.syncMode === 'leader' && leaderId
+        ? { id: leaderId, heartbeatAt: now, epoch: 0 }
+        : null;
+
+    return {
+      version: SHARED_STATE_VERSION,
+      updatedAt: now,
+      syncMode: config.syncMode,
+      leader: leaderInfo,
+      snapshot: {
+        state: snapshot.state,
+        remainingMs: snapshot.remainingMs,
+        idleStartAt: snapshot.idleStartAt,
+        countdownEndAt: snapshot.countdownEndAt,
+        lastActivityAt: snapshot.lastActivityAt,
+        paused: snapshot.paused
+      },
+      config: {
+        idleGraceMs: config.idleGraceMs,
+        countdownMs: config.countdownMs,
+        warnBeforeMs: config.warnBeforeMs,
+        activityResetCooldownMs: config.activityResetCooldownMs,
+        storageKeyPrefix: config.storageKeyPrefix,
+        syncMode: config.syncMode,
+        resumeBehavior: config.resumeBehavior,
+        ignoreUserActivityWhenPaused: config.ignoreUserActivityWhenPaused,
+        allowManualExtendWhenExpired: config.allowManualExtendWhenExpired
+      }
+    };
+  }
+
+  private broadcastSharedState(options?: { persist?: boolean; crossTab?: boolean }): void {
+    if (this.isApplyingSharedState) {
+      return;
+    }
+    const config = this.configSignal();
+    if (config.syncMode === 'leader' && this.leaderElection?.isLeader() === false) {
+      return;
+    }
+
+    const state = this.buildSharedSessionState();
+    const persist = options?.persist ?? true;
+    const crossTab = options?.crossTab ?? true;
+
+    this.sharedStateCoordinator.publishState(state, { persist, broadcast: crossTab });
+    if (crossTab) {
+      const broadcast = () => this.broadcastCrossTab('sync', { sharedState: state });
+      if (this.isHandlingCrossTabMessage) {
+        if (typeof queueMicrotask === 'function') {
+          queueMicrotask(broadcast);
+        } else {
+          Promise.resolve().then(broadcast);
+        }
+      } else {
+        broadcast();
+      }
+    }
+  }
+
+  private handleSyncRequest(message: CrossTabMessage): void {
+    const config = this.configSignal();
+    if (config.syncMode === 'leader' && this.leaderElection?.isLeader() === false) {
+      return;
+    }
+    this.broadcastSharedState();
   }
   private restoreFromStorage(): void {
     const initialConfig = this.configSignal();
@@ -839,6 +983,9 @@ export class SessionTimeoutService {
     this.refreshDerivedDurations();
     if (!this.isRestoring) {
       persistSnapshot(this.storage, this.configSignal().storageKeyPrefix, this.snapshotSignal());
+    }
+    if (!this.isRestoring && !this.isApplyingSharedState) {
+      this.broadcastSharedState();
     }
   }
 

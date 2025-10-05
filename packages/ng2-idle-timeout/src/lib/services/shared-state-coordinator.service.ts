@@ -218,6 +218,7 @@ export class SharedStateCoordinatorService {
       leader: state.leader ?? null,
       snapshot: {
         state: state.snapshot.state,
+        remainingMs: state.snapshot.remainingMs,
         idleStartAt: state.snapshot.idleStartAt ?? null,
         countdownEndAt: state.snapshot.countdownEndAt ?? null,
         lastActivityAt: state.snapshot.lastActivityAt ?? null,
@@ -290,6 +291,7 @@ export class SharedStateCoordinatorService {
     const record = snapshot as Record<string, unknown>;
     return (
       typeof record.state === 'string' &&
+      typeof record.remainingMs === 'number' &&
       (record.idleStartAt === null || typeof record.idleStartAt === 'number') &&
       (record.countdownEndAt === null || typeof record.countdownEndAt === 'number') &&
       (record.lastActivityAt === null || typeof record.lastActivityAt === 'number') &&

@@ -1,6 +1,7 @@
 import type { SessionSnapshot } from './session-state';
+import type { SharedSessionState } from './session-shared-state';
 
-export type CrossTabMessageType = 'extend' | 'expire' | 'sync' | 'reset';
+export type CrossTabMessageType = 'extend' | 'expire' | 'sync' | 'reset' | 'sync-request';
 
 export interface CrossTabMessage {
   sourceId: string;
@@ -8,6 +9,7 @@ export interface CrossTabMessage {
   at: number;
   payload?: {
     snapshot?: SessionSnapshot;
+    sharedState?: SharedSessionState;
     reason?: unknown;
     activitySource?: string;
   };
