@@ -2,11 +2,11 @@
 
 ## Summary
 - Date: 2025-10-05
-- Overall status: Not Started
+- Overall status: In Progress
 - Blockers: None
 
 ## Work Items
-- cp1-discovery: Next
+- cp1-discovery: Done
 - cp2a-config: Next
 - cp2b-coordinator: Next
 - cp2c-messaging: Next
@@ -21,3 +21,4 @@
 
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
+- 2025-10-05 22:58 - Completed Checkpoint 1 discovery with design brief, syncMode behaviour matrix, risk & verification outline (`docs/planning/cross-tab-sync-discovery.md`).

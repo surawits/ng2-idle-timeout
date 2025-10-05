@@ -14,8 +14,8 @@
 - Target completion: 2025-10-19
 
 ## Checkpoints
-- [ ] Checkpoint 1 – Discovery & Design Notes
-  - Deliverables: architectural brief, behaviour matrix for syncMode, risk log, verification outline.
+- [x] Checkpoint 1 – Discovery & Design Notes
+  - Deliverables: architectural brief, behaviour matrix for syncMode, risk log, verification outline (`docs/planning/cross-tab-sync-discovery.md`).
 - [ ] Checkpoint 2 – Shared State Foundations
   - Sub-checkpoints:
     - [ ] 2a Config & Validation updates for syncMode and schema adjustments.
