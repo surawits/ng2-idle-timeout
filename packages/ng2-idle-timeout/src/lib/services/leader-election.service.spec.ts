@@ -18,6 +18,7 @@ describe('LeaderElectionService', () => {
     activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
+    syncMode: 'leader',
     strategy: 'userOnly',
     httpActivity: {
       enabled: false,

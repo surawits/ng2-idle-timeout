@@ -17,7 +17,7 @@ items:
 - id: cp2b-coordinator
   title: 2b Shared-state coordinator implementation
   owner: codex
-  status: Next
+  status: Done
   notes: storage+broadcast abstraction with tests
   dependencies:
   - cp2a-config

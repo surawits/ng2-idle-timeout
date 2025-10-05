@@ -19,7 +19,7 @@
 - [ ] Checkpoint 2 – Shared State Foundations
   - Sub-checkpoints:
     - [x] 2a Config & Validation updates for syncMode and schema adjustments (`packages/ng2-idle-timeout/src/lib/validation.ts`).
-    - [ ] 2b Shared-state coordinator (storage + broadcast) with unit tests.
+    - [x] 2b Shared-state coordinator (storage + broadcast) with unit tests (`packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.ts`).
     - [ ] 2c Cross-tab messaging contract revisions and baseline tests.
 - [ ] Checkpoint 3 – Leader Mode Rework
   - Sub-checkpoints:
