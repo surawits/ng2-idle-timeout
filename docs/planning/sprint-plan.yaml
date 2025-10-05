@@ -1,33 +1,4 @@
-goal: Add configurable DOM activity event include list with live reconfiguration support for ng2-idle-timeout
-owner: codex
-items:
-  - id: plan-analysis
-    title: Capture plan and review existing DOM activity implementation
-    owner: codex
-    status: Done
-    dependencies: []
-  - id: dom-config
-    title: Extend configuration defaults and ActivityDomService for event include list
-    owner: codex
-    status: Done
-    dependencies:
-      - plan-analysis
-  - id: tests
-    title: Expand unit tests for DOM event toggling and runtime reconfigure
-    owner: codex
-    status: Done
-    dependencies:
-      - dom-config
-  - id: docs
-    title: Update README and playground with event configuration guidance
-    owner: codex
-    status: Done
-    dependencies:
-      - dom-config
-  - id: wrap
-    title: Run verification, update progress log, summarize results
-    owner: codex
-    status: Done
-    dependencies:
-      - tests
-      - docs
+goal: No active sprint
+owner: unassigned
+items: []
+updated: 2025-10-05T22:30:12+07:00

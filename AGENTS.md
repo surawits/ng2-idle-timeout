@@ -26,8 +26,11 @@ Reference for predictable ng2-idle-timeout work.
 - Pull requests list verification performed and attach UX screenshots or GIFs when relevant.
 
 ## Agent Workflow Expectations
-- At session start reread the conversation plan, `docs/planning/` records, and `git status` to regain context.
-- Publish a multi-step plan via the planning tool, update statuses as work proceeds, and clear it when finished.
+- Before starting any checkpoint (including session kickoff), reread the conversation plan, `docs/planning/` records, and `git status` to regain context.
+- Review the essential files tied to the upcoming checkpoint before drafting or adjusting the plan.
+- Publish a multi-step plan via the planning tool, treating each item as a checkpoint; break large checkpoints into sub-checkpoints when scope expands.
+- Mirror plan changes into `docs/planning/sprint-plan.md` and `docs/planning/sprint-plan.yaml` so repository records match the active checkpoint list.
+- Update `docs/planning/sprint-progress.md` as soon as a checkpoint or sub-checkpoint is completed, capturing blockers, approvals, and follow-ups.
 - Issue commands with explicit `workdir`, prefer `rg` for searches, and avoid hidden shell state.
 - Surface blockers immediately; do not retry blindly.
 - Run focused tests or linters when possible, flag skipped checks, and summarize outcomes with `path:line` references plus next steps.
