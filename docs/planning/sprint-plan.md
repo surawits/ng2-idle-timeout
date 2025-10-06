@@ -29,7 +29,7 @@
 - [ ] Checkpoint 4 – Distributed Mode Implementation
   - Sub-checkpoints:
     - [x] 4a Consensus rules and conflict-resolution algorithm (Done).
-    - [ ] 4b Service wiring for distributed reconciliation and activity propagation.
+    - [x] 4b Service wiring for distributed reconciliation and activity propagation (Done).
     - [ ] 4c Distributed-mode test coverage.
 - [ ] Checkpoint 5 – Playground & Integration Updates
   - Deliverables: multi-tab demo controls, manual validation script, optional smoke tests.

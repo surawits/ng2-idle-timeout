@@ -9,7 +9,10 @@ import {
   type SharedSessionState,
   type SharedStateMessage,
   type SharedStateBroadcastMessage,
-  type SharedStateRequestMessage
+  type SharedStateRequestMessage,
+  type SharedStateMetadata,
+  type SharedStateOperation,
+  type SharedConfigPayload
 } from '../models/session-shared-state';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { createBroadcastChannel, type BroadcastAdapter } from '../utils/broadcast-channel';
@@ -19,6 +22,16 @@ export interface SharedStatePublishOptions {
   persist?: boolean;
   broadcast?: boolean;
 }
+
+interface LegacySharedConfigPayload
+  extends Omit<SharedConfigPayload, 'revision' | 'logicalClock' | 'writerId'>,
+    Partial<Pick<SharedConfigPayload, 'revision' | 'logicalClock' | 'writerId'>> {}
+
+type LegacySharedSessionState = Omit<SharedSessionState, 'version' | 'metadata' | 'config'> & {
+  version?: number;
+  metadata?: Partial<SharedStateMetadata>;
+  config: LegacySharedConfigPayload;
+};
 
 @Injectable({ providedIn: 'root' })
 export class SharedStateCoordinatorService {
@@ -42,6 +55,10 @@ export class SharedStateCoordinatorService {
   private readonly sourceId = generateCoordinatorId();
 
   readonly updates$ = this.updatesSubject.asObservable();
+
+  getSourceId(): string {
+    return this.sourceId;
+  }
 
   constructor() {
     if (this.providedConfig) {
@@ -83,7 +100,7 @@ export class SharedStateCoordinatorService {
     }
   }
 
-  requestSync(reason?: string): void {
+  requestSync(reason?: string, expectReply?: boolean): void {
     if (this.disposed) {
       return;
     }
@@ -91,7 +108,8 @@ export class SharedStateCoordinatorService {
       type: 'request-sync',
       sourceId: this.sourceId,
       at: this.timeSource.now(),
-      reason
+      reason,
+      expectReply
     });
   }
 
@@ -105,8 +123,8 @@ export class SharedStateCoordinatorService {
       if (!raw) {
         return null;
       }
-      const parsed = JSON.parse(raw) as SharedSessionState;
-      return this.isSharedSessionState(parsed) ? parsed : null;
+      const parsed = JSON.parse(raw) as unknown;
+      return this.coerceSharedState(parsed);
     } catch (error) {
       console.warn('[ng2-idle-timeout] Unable to parse shared state from storage', error);
       return null;
@@ -199,43 +217,134 @@ export class SharedStateCoordinatorService {
     }
 
     if (payload.type === 'state') {
-      if (this.isSharedSessionState(payload.state)) {
-        this.persistSharedState(payload.state);
-      } else {
+      const normalized = this.coerceSharedState((payload as SharedStateBroadcastMessage).state);
+      if (!normalized) {
         return;
       }
+      this.persistSharedState(normalized);
+      const message: SharedStateBroadcastMessage = {
+        type: 'state',
+        sourceId: payload.sourceId,
+        at: payload.at,
+        state: normalized
+      };
+      this.updatesSubject.next(message);
+      return;
     }
 
     this.updatesSubject.next(payload);
   }
 
-  private normalizeState(state: SharedSessionState): SharedSessionState {
-    const updatedAt = state.updatedAt ?? this.timeSource.now();
+  private normalizeState(state: LegacySharedSessionState | SharedSessionState): SharedSessionState {
+    const updatedAt = typeof state.updatedAt === 'number' ? state.updatedAt : this.timeSource.now();
+    const syncMode = state.syncMode === 'distributed' ? 'distributed' : 'leader';
+    const leader = state.leader && this.isLeaderInfo(state.leader) ? state.leader : null;
+    const snapshot = this.normalizeSnapshot(state.snapshot);
+    const config = this.normalizeConfig(state.config);
+    const metadata = this.normalizeMetadata(state.metadata, updatedAt);
     return {
       version: SHARED_STATE_VERSION,
       updatedAt,
-      syncMode: state.syncMode,
-      leader: state.leader ?? null,
-      snapshot: {
-        state: state.snapshot.state,
-        remainingMs: state.snapshot.remainingMs,
-        idleStartAt: state.snapshot.idleStartAt ?? null,
-        countdownEndAt: state.snapshot.countdownEndAt ?? null,
-        lastActivityAt: state.snapshot.lastActivityAt ?? null,
-        paused: state.snapshot.paused ?? false
-      },
-      config: {
-        idleGraceMs: state.config.idleGraceMs,
-        countdownMs: state.config.countdownMs,
-        warnBeforeMs: state.config.warnBeforeMs,
-        activityResetCooldownMs: state.config.activityResetCooldownMs,
-        storageKeyPrefix: state.config.storageKeyPrefix,
-        syncMode: state.config.syncMode,
-        resumeBehavior: state.config.resumeBehavior,
-        ignoreUserActivityWhenPaused: state.config.ignoreUserActivityWhenPaused,
-        allowManualExtendWhenExpired: state.config.allowManualExtendWhenExpired
-      }
+      syncMode,
+      leader,
+      metadata,
+      snapshot,
+      config
     };
+  }
+
+  private normalizeMetadata(
+    metadata: Partial<SharedStateMetadata> | undefined,
+    fallbackClock: number
+  ): SharedStateMetadata {
+    const writerId =
+      typeof metadata?.writerId === 'string' && metadata.writerId.length > 0 ? metadata.writerId : this.sourceId;
+    const logicalClock =
+      typeof metadata?.logicalClock === 'number' && Number.isFinite(metadata.logicalClock) && metadata.logicalClock > 0
+        ? metadata.logicalClock
+        : fallbackClock;
+    const revision =
+      typeof metadata?.revision === 'number' && Number.isFinite(metadata.revision) && metadata.revision > 0
+        ? metadata.revision
+        : 1;
+    const operation = this.normalizeOperation(metadata?.operation);
+    const causalityToken =
+      typeof metadata?.causalityToken === 'string' && metadata.causalityToken.length > 0
+        ? metadata.causalityToken
+        : writerId + ':' + logicalClock;
+    return { revision, logicalClock, writerId, operation, causalityToken };
+  }
+
+  private normalizeOperation(operation: SharedStateOperation | undefined): SharedStateOperation {
+    switch (operation) {
+      case 'reset-by-activity':
+      case 'manual-extend':
+      case 'auto-extend':
+      case 'pause':
+      case 'resume':
+      case 'expire':
+      case 'config-change':
+      case 'bootstrap':
+        return operation;
+      default:
+        return 'bootstrap';
+    }
+  }
+
+  private normalizeSnapshot(snapshot: unknown): SharedSessionState['snapshot'] {
+    if (!this.isSharedSnapshot(snapshot)) {
+      throw new Error('invalid shared snapshot');
+    }
+    const record = snapshot as SharedSessionState['snapshot'];
+    return {
+      state: record.state,
+      remainingMs: record.remainingMs,
+      idleStartAt: record.idleStartAt ?? null,
+      countdownEndAt: record.countdownEndAt ?? null,
+      lastActivityAt: record.lastActivityAt ?? null,
+      paused: record.paused ?? false
+    };
+  }
+
+  private normalizeConfig(config: unknown): SharedConfigPayload {
+    if (!this.isLegacySharedConfig(config)) {
+      throw new Error('invalid shared config');
+    }
+    const record = config as LegacySharedConfigPayload;
+    return {
+      idleGraceMs: record.idleGraceMs,
+      countdownMs: record.countdownMs,
+      warnBeforeMs: record.warnBeforeMs,
+      activityResetCooldownMs: record.activityResetCooldownMs,
+      storageKeyPrefix: record.storageKeyPrefix,
+      syncMode: record.syncMode === 'distributed' ? 'distributed' : 'leader',
+      resumeBehavior: record.resumeBehavior,
+      ignoreUserActivityWhenPaused: record.ignoreUserActivityWhenPaused,
+      allowManualExtendWhenExpired: record.allowManualExtendWhenExpired,
+      revision:
+        typeof record.revision === 'number' && Number.isFinite(record.revision) && record.revision > 0
+          ? record.revision
+          : 1,
+      logicalClock:
+        typeof record.logicalClock === 'number' &&
+        Number.isFinite(record.logicalClock) &&
+        record.logicalClock > 0
+          ? record.logicalClock
+          : 1,
+      writerId: typeof record.writerId === 'string' && record.writerId.length > 0 ? record.writerId : this.sourceId
+    };
+  }
+
+  private coerceSharedState(candidate: unknown): SharedSessionState | null {
+    if (!candidate || typeof candidate !== 'object') {
+      return null;
+    }
+    try {
+      const normalized = this.normalizeState(candidate as LegacySharedSessionState | SharedSessionState);
+      return this.isSharedSessionState(normalized) ? normalized : null;
+    } catch {
+      return null;
+    }
   }
 
   private isSharedStateMessage(payload: unknown): payload is SharedStateMessage {
@@ -248,7 +357,8 @@ export class SharedStateCoordinatorService {
     }
 
     if (record.type === 'state') {
-      return this.isSharedStateBroadcastMessage(record);
+      const stateCandidate = record.state;
+      return typeof stateCandidate === 'object' && stateCandidate !== null;
     }
 
     if (record.type === 'request-sync') {
@@ -256,15 +366,6 @@ export class SharedStateCoordinatorService {
     }
 
     return false;
-  }
-
-  private isSharedStateBroadcastMessage(payload: unknown): payload is SharedStateBroadcastMessage {
-    if (!payload || typeof payload !== 'object') {
-      return false;
-    }
-    const record = payload as Record<string, unknown>;
-    const stateCandidate = record.state as SharedSessionState | undefined;
-    return !!stateCandidate && this.isSharedSessionState(stateCandidate);
   }
 
   private isSharedSessionState(candidate: unknown): candidate is SharedSessionState {
@@ -275,13 +376,14 @@ export class SharedStateCoordinatorService {
     if (record.version !== SHARED_STATE_VERSION) {
       return false;
     }
-    if (!this.isSharedSnapshot(record.snapshot) || !this.isSharedConfig(record.config)) {
+    if (!this.isSharedSnapshot(record.snapshot) || !this.isSharedConfig(record.config) || !this.isSharedMetadata(record.metadata)) {
       return false;
     }
     if (record.leader != null && !this.isLeaderInfo(record.leader)) {
       return false;
     }
-    return typeof record.updatedAt === 'number' && typeof record.syncMode === 'string';
+    const syncMode = record.syncMode;
+    return typeof record.updatedAt === 'number' && (syncMode === 'leader' || syncMode === 'distributed');
   }
 
   private isSharedSnapshot(snapshot: unknown): snapshot is SharedSessionState['snapshot'] {
@@ -299,11 +401,11 @@ export class SharedStateCoordinatorService {
     );
   }
 
-  private isSharedConfig(config: unknown): config is SharedSessionState['config'] {
+  private isLegacySharedConfig(config: unknown): config is LegacySharedConfigPayload {
     if (!config || typeof config !== 'object') {
       return false;
     }
-    const record = config as Record<string, unknown>;
+    const record = config as unknown as Record<string, unknown>;
     const resumeBehavior = record.resumeBehavior;
     const resumeValid =
       resumeBehavior === undefined || resumeBehavior === 'manual' || resumeBehavior === 'autoOnServerSync';
@@ -317,6 +419,49 @@ export class SharedStateCoordinatorService {
       resumeValid &&
       typeof record.ignoreUserActivityWhenPaused === 'boolean' &&
       typeof record.allowManualExtendWhenExpired === 'boolean'
+    );
+  }
+
+  private isSharedConfig(config: unknown): config is SharedConfigPayload {
+    if (!this.isLegacySharedConfig(config)) {
+      return false;
+    }
+    const record = config as unknown as Record<string, unknown>;
+    return (
+      typeof record.revision === 'number' &&
+      Number.isFinite(record.revision) &&
+      typeof record.logicalClock === 'number' &&
+      Number.isFinite(record.logicalClock) &&
+      typeof record.writerId === 'string' &&
+      record.writerId.length > 0
+    );
+  }
+
+  private isSharedMetadata(metadata: unknown): metadata is SharedStateMetadata {
+    if (!metadata || typeof metadata !== 'object') {
+      return false;
+    }
+    const record = metadata as Record<string, unknown>;
+    const operation = record.operation;
+    const operationValid =
+      operation === 'bootstrap' ||
+      operation === 'reset-by-activity' ||
+      operation === 'manual-extend' ||
+      operation === 'auto-extend' ||
+      operation === 'pause' ||
+      operation === 'resume' ||
+      operation === 'expire' ||
+      operation === 'config-change';
+    return (
+      typeof record.revision === 'number' &&
+      Number.isFinite(record.revision) &&
+      typeof record.logicalClock === 'number' &&
+      Number.isFinite(record.logicalClock) &&
+      typeof record.writerId === 'string' &&
+      record.writerId.length > 0 &&
+      typeof record.causalityToken === 'string' &&
+      record.causalityToken.length > 0 &&
+      operationValid
     );
   }
 

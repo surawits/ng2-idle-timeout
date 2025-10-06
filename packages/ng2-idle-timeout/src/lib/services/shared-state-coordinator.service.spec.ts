@@ -105,31 +105,62 @@ describe('SharedStateCoordinatorService', () => {
     localStorage.clear();
   });
 
-  function createSharedState(overrides?: Partial<SharedSessionState>): SharedSessionState {
+  function createSharedState(
+    overrides?: Partial<Omit<SharedSessionState, 'config' | 'metadata'>> & {
+      config?: Partial<SharedSessionState['config']>;
+      metadata?: Partial<SharedSessionState['metadata']>;
+    }
+  ): SharedSessionState {
+    const now = time.now();
+    const writerId = overrides?.metadata?.writerId ?? 'remote-coord';
+    const logicalClock = overrides?.metadata?.logicalClock ?? now;
+
+    const metadata: SharedSessionState['metadata'] = {
+      revision: overrides?.metadata?.revision ?? 1,
+      logicalClock,
+      writerId,
+      operation: overrides?.metadata?.operation ?? 'bootstrap',
+      causalityToken: overrides?.metadata?.causalityToken ?? writerId + ':' + logicalClock
+    };
+
+    const snapshot: SharedSessionState['snapshot'] = overrides?.snapshot ?? {
+      state: 'IDLE',
+      remainingMs: baseConfig.countdownMs,
+      idleStartAt: now,
+      countdownEndAt: now + baseConfig.countdownMs,
+      lastActivityAt: now,
+      paused: false
+    };
+
+    const configWriterId = overrides?.config?.writerId ?? writerId;
+    const configLogicalClock = overrides?.config?.logicalClock ?? logicalClock;
+
+    const config: SharedSessionState['config'] = {
+      idleGraceMs: overrides?.config?.idleGraceMs ?? baseConfig.idleGraceMs,
+      countdownMs: overrides?.config?.countdownMs ?? baseConfig.countdownMs,
+      warnBeforeMs: overrides?.config?.warnBeforeMs ?? baseConfig.warnBeforeMs,
+      activityResetCooldownMs:
+        overrides?.config?.activityResetCooldownMs ?? baseConfig.activityResetCooldownMs,
+      storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
+      syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
+      resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
+      ignoreUserActivityWhenPaused:
+        overrides?.config?.ignoreUserActivityWhenPaused ?? baseConfig.ignoreUserActivityWhenPaused,
+      allowManualExtendWhenExpired:
+        overrides?.config?.allowManualExtendWhenExpired ?? baseConfig.allowManualExtendWhenExpired,
+      revision: overrides?.config?.revision ?? 1,
+      logicalClock: configLogicalClock,
+      writerId: configWriterId
+    };
+
     return {
       version: SHARED_STATE_VERSION,
-      updatedAt: overrides?.updatedAt ?? time.now(),
+      updatedAt: overrides?.updatedAt ?? now,
       syncMode: overrides?.syncMode ?? 'leader',
       leader: overrides?.leader ?? null,
-      snapshot: overrides?.snapshot ?? {
-        state: 'IDLE',
-        remainingMs: 1_000,
-        idleStartAt: null,
-        countdownEndAt: null,
-        lastActivityAt: null,
-        paused: false
-      },
-      config: overrides?.config ?? {
-        idleGraceMs: 100,
-        countdownMs: 1_000,
-        warnBeforeMs: 200,
-        activityResetCooldownMs: 0,
-        storageKeyPrefix: baseConfig.storageKeyPrefix,
-        syncMode: overrides?.syncMode ?? 'leader',
-        resumeBehavior: undefined,
-        ignoreUserActivityWhenPaused: false,
-        allowManualExtendWhenExpired: false
-      }
+      metadata,
+      snapshot,
+      config
     };
   }
 

@@ -23,6 +23,7 @@ class SharedStateCoordinatorStub {
   requestSync = jest.fn();
   readPersistedState = jest.fn<SharedSessionState | null, []>(() => null);
   clearPersistedState = jest.fn();
+  getSourceId = jest.fn(() => 'coordinator-stub');
   private readonly updatesSubject = new Subject<SharedStateMessage>();
   readonly updates$ = this.updatesSubject.asObservable();
 
@@ -225,34 +226,66 @@ describe('SessionTimeoutService cross-tab sync', () => {
     return service.getSnapshot();
   }
 
-  function buildSharedState(overrides?: Partial<SharedSessionState>): SharedSessionState {
+  function buildSharedState(
+    overrides?: Partial<Omit<SharedSessionState, 'config' | 'metadata'>> & {
+      config?: Partial<SharedSessionState['config']>;
+      metadata?: Partial<SharedSessionState['metadata']>;
+    }
+  ): SharedSessionState {
     const now = time.now();
+    const writerId = overrides?.metadata?.writerId ?? 'remote-coord';
+    const logicalClock = overrides?.metadata?.logicalClock ?? now;
+
+    const metadata: SharedSessionState['metadata'] = {
+      revision: overrides?.metadata?.revision ?? 1,
+      logicalClock,
+      writerId,
+      operation: overrides?.metadata?.operation ?? 'bootstrap',
+      causalityToken: overrides?.metadata?.causalityToken ?? writerId + ':' + logicalClock
+    };
+
+    const snapshot: SharedSessionState['snapshot'] = overrides?.snapshot ?? {
+      state: 'IDLE',
+      remainingMs: baseConfig.countdownMs,
+      idleStartAt: now,
+      countdownEndAt: now + baseConfig.countdownMs,
+      lastActivityAt: now,
+      paused: false
+    };
+
+    const configWriterId = overrides?.config?.writerId ?? writerId;
+    const configLogicalClock = overrides?.config?.logicalClock ?? logicalClock;
+
+    const config: SharedSessionState['config'] = {
+      idleGraceMs: overrides?.config?.idleGraceMs ?? baseConfig.idleGraceMs,
+      countdownMs: overrides?.config?.countdownMs ?? baseConfig.countdownMs,
+      warnBeforeMs: overrides?.config?.warnBeforeMs ?? baseConfig.warnBeforeMs,
+      activityResetCooldownMs:
+        overrides?.config?.activityResetCooldownMs ?? baseConfig.activityResetCooldownMs,
+      storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
+      syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
+      resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
+      ignoreUserActivityWhenPaused:
+        overrides?.config?.ignoreUserActivityWhenPaused ?? baseConfig.ignoreUserActivityWhenPaused,
+      allowManualExtendWhenExpired:
+        overrides?.config?.allowManualExtendWhenExpired ?? baseConfig.allowManualExtendWhenExpired,
+      revision: overrides?.config?.revision ?? 1,
+      logicalClock: configLogicalClock,
+      writerId: configWriterId
+    };
+
     return {
       version: SHARED_STATE_VERSION,
       updatedAt: overrides?.updatedAt ?? now,
       syncMode: overrides?.syncMode ?? 'leader',
       leader: overrides?.leader ?? null,
-      snapshot: overrides?.snapshot ?? {
-        state: 'IDLE',
-        remainingMs: baseConfig.countdownMs,
-        idleStartAt: now,
-        countdownEndAt: now + baseConfig.countdownMs,
-        lastActivityAt: now,
-        paused: false
-      },
-      config: overrides?.config ?? {
-        idleGraceMs: baseConfig.idleGraceMs,
-        countdownMs: baseConfig.countdownMs,
-        warnBeforeMs: baseConfig.warnBeforeMs,
-        activityResetCooldownMs: baseConfig.activityResetCooldownMs,
-        storageKeyPrefix: baseConfig.storageKeyPrefix,
-        syncMode: overrides?.syncMode ?? baseConfig.syncMode,
-        resumeBehavior: baseConfig.resumeBehavior,
-        ignoreUserActivityWhenPaused: baseConfig.ignoreUserActivityWhenPaused,
-        allowManualExtendWhenExpired: baseConfig.allowManualExtendWhenExpired
-      }
+      metadata,
+      snapshot,
+      config
     };
   }
+
+
 
   it('publishes extend messages with snapshot details', () => {
     const messages: CrossTabMessage[] = [];
@@ -352,7 +385,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
         resumeBehavior: 'autoOnServerSync',
         ignoreUserActivityWhenPaused: true,
         allowManualExtendWhenExpired: true
-      },
+      } as Partial<SharedSessionState['config']>,
       snapshot: {
         state: 'COUNTDOWN',
         remainingMs: 900,

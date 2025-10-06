@@ -1,12 +1,30 @@
 import type { SessionSyncMode } from './session-timeout-config';
 import type { SessionState } from './session-state';
 
-export const SHARED_STATE_VERSION = 2;
+export const SHARED_STATE_VERSION = 3;
+
+export type SharedStateOperation =
+  | 'bootstrap'
+  | 'reset-by-activity'
+  | 'manual-extend'
+  | 'auto-extend'
+  | 'pause'
+  | 'resume'
+  | 'expire'
+  | 'config-change';
 
 export interface LeaderInfo {
   id: string;
   heartbeatAt: number;
   epoch: number;
+}
+
+export interface SharedStateMetadata {
+  revision: number;
+  logicalClock: number;
+  writerId: string;
+  operation: SharedStateOperation;
+  causalityToken: string;
 }
 
 export interface SharedConfigPayload {
@@ -19,6 +37,9 @@ export interface SharedConfigPayload {
   resumeBehavior: 'manual' | 'autoOnServerSync' | undefined;
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
+  revision: number;
+  logicalClock: number;
+  writerId: string;
 }
 
 export interface SharedSessionSnapshot {
@@ -35,6 +56,7 @@ export interface SharedSessionState {
   updatedAt: number;
   syncMode: SessionSyncMode;
   leader: LeaderInfo | null;
+  metadata: SharedStateMetadata;
   snapshot: SharedSessionSnapshot;
   config: SharedConfigPayload;
 }
@@ -55,6 +77,7 @@ export interface SharedStateBroadcastMessage extends SharedStateMessageBase {
 export interface SharedStateRequestMessage extends SharedStateMessageBase {
   type: 'request-sync';
   reason?: string;
+  expectReply?: boolean;
 }
 
 export type SharedStateMessage = SharedStateBroadcastMessage | SharedStateRequestMessage;

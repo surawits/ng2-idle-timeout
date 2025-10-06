@@ -59,7 +59,7 @@ items:
 - id: cp4b-distributed-service
   title: 4b Distributed reconciliation wiring
   owner: codex
-  status: Next
+  status: Done
   notes: service implementation for multi-writer consistency
   dependencies:
   - cp4a-distributed-rules
