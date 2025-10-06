@@ -52,7 +52,7 @@ items:
 - id: cp4a-distributed-rules
   title: 4a Distributed consensus rules design
   owner: codex
-  status: Next
+  status: Done
   notes: conflict resolution algorithm, metadata requirements
   dependencies:
   - cp3c-leader-tests

@@ -28,7 +28,7 @@
     - [x] 3c Leader-mode regression test suite rewrite.
 - [ ] Checkpoint 4 – Distributed Mode Implementation
   - Sub-checkpoints:
-    - [ ] 4a Consensus rules and conflict-resolution algorithm.
+    - [x] 4a Consensus rules and conflict-resolution algorithm (Done).
     - [ ] 4b Service wiring for distributed reconciliation and activity propagation.
     - [ ] 4c Distributed-mode test coverage.
 - [ ] Checkpoint 5 – Playground & Integration Updates

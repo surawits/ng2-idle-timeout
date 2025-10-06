@@ -13,7 +13,7 @@
 - cp3a-leader-integration: Done
 - cp3b-leader-lifecycle: Done
 - cp3c-leader-tests: Done
-- cp4a-distributed-rules: Next
+- cp4a-distributed-rules: Done
 - cp4b-distributed-service: Next
 - cp4c-distributed-tests: Next
 - cp5-playground: Next
@@ -32,3 +32,6 @@
 - 2025-10-06 16:20 - Completed CP3c leader-mode regression suite additions covering heartbeat staleness, follower catch-up, and sync throttling; verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/session-timeout-cross-tab.spec.ts src/lib/services/session-timeout.service.spec.ts --runInBand`.
 
 - 2025-10-06 16:25 - Checkpoint 3 Leader Mode Rework marked complete following regression suite updates and verification runs.
+- 2025-10-06 12:30 - Started CP4a distributed consensus design; reviewing shared-state schema and conflict scenarios.
+- 2025-10-06 12:58 - Completed CP4a distributed consensus rules; documented Lamport-based ordering and implementation checklist (docs/planning/distributed-consensus-rules.md).
+
