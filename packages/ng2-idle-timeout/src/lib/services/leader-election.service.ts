@@ -9,8 +9,8 @@ interface LeaderRecord {
   updatedAt: number;
 }
 
-const HEARTBEAT_INTERVAL_MS = 1500;
-const LEADER_TTL_MS = HEARTBEAT_INTERVAL_MS * 3;
+export const HEARTBEAT_INTERVAL_MS = 1500;
+export const LEADER_TTL_MS = HEARTBEAT_INTERVAL_MS * 3;
 
 @Injectable({ providedIn: 'root' })
 export class LeaderElectionService {

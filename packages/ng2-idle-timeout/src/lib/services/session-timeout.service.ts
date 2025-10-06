@@ -1,4 +1,5 @@
 import { DestroyRef, Injectable, NgZone, computed, effect, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import type { Signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { Subject, interval, takeUntil } from 'rxjs';
@@ -23,7 +24,7 @@ import { ServerTimeService } from './server-time.service';
 import { validateConfig } from '../validation';
 import { ActivityDomService } from './activity-dom.service';
 import { ActivityRouterService } from './activity-router.service';
-import { LeaderElectionService } from './leader-election.service';
+import { LeaderElectionService, HEARTBEAT_INTERVAL_MS, LEADER_TTL_MS } from './leader-election.service';
 import { SharedStateCoordinatorService } from './shared-state-coordinator.service';
 import {
   createStorage,
@@ -62,12 +63,41 @@ export class SessionTimeoutService {
   private serverTimeListenerRegistered = false;
   private readonly leaderElection = inject(LeaderElectionService, { optional: true });
   private readonly sharedStateCoordinator = inject(SharedStateCoordinatorService);
+  private readonly documentRef = inject(DOCUMENT, { optional: true }) as Document | undefined;
+  private readonly windowRef: Window | null = typeof window === 'undefined' ? null : window;
   private leaderState: boolean | null = null;
+  private leaderEpoch = 0;
+  private lastKnownLeaderId: string | null = null;
+  private latestSharedState: SharedSessionState | null = null;
+  private lastHiddenAt: number | null = null;
+  private lastSyncRequestAt: number | null = null;
   private readonly leaderWatcher = this.leaderElection
     ? effect(() => {
         this.syncLeaderState();
       })
     : null;
+  private readonly handleVisibilityChange = (): void => {
+    if (!this.documentRef) {
+      return;
+    }
+    const state = this.documentRef.visibilityState;
+    if (state === 'hidden') {
+      this.lastHiddenAt = this.timeSource.now();
+      return;
+    }
+    if (state === 'visible') {
+      this.handleVisibilityResume('visibilitychange');
+    }
+  };
+
+  private readonly handlePageHide = (): void => {
+    this.lastHiddenAt = this.timeSource.now();
+  };
+
+  private readonly handlePageShow = (): void => {
+    this.handleVisibilityResume('pageshow');
+  };
+
   private readonly storage: StorageAdapter = createStorage();
   private isRestoring = false;
   private isApplyingSharedState = false;
@@ -178,6 +208,17 @@ export class SessionTimeoutService {
       });
     }
 
+    if (this.documentRef) {
+      this.documentRef.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    if (this.windowRef) {
+      this.windowRef.addEventListener('pageshow', this.handlePageShow);
+      this.windowRef.addEventListener('pagehide', this.handlePageHide);
+    }
+    if (this.documentRef && this.documentRef.visibilityState === 'hidden') {
+      this.lastHiddenAt = this.timeSource.now();
+    }
+
     this.registerServerTimeListener();
 
     this.restoreFromStorage();
@@ -188,6 +229,7 @@ export class SessionTimeoutService {
 
     const persistedSharedState = this.sharedStateCoordinator.readPersistedState();
     if (persistedSharedState) {
+      this.latestSharedState = persistedSharedState;
       this.applySharedSessionState(persistedSharedState);
     } else {
       this.sharedStateCoordinator.requestSync('initial');
@@ -199,6 +241,7 @@ export class SessionTimeoutService {
       .subscribe(message => {
         this.zone.run(() => {
           if (message.type === 'state') {
+            this.latestSharedState = message.state;
             this.applySharedSessionState(message.state);
           } else if (message.type === 'request-sync') {
             this.broadcastSharedState({ crossTab: true });
@@ -212,6 +255,13 @@ export class SessionTimeoutService {
       this.stopTicker();
       this.eventsSubject.complete();
       this.activitySubject.complete();
+      if (this.documentRef) {
+        this.documentRef.removeEventListener('visibilitychange', this.handleVisibilityChange);
+      }
+      if (this.windowRef) {
+        this.windowRef.removeEventListener('pageshow', this.handlePageShow);
+        this.windowRef.removeEventListener('pagehide', this.handlePageHide);
+      }
       this.leaderWatcher?.destroy();
       this.leaderElection?.stepDown();
       this.teardownCrossTabChannel();
@@ -699,6 +749,11 @@ export class SessionTimeoutService {
   }
 
   private applySharedSessionState(sharedState: SharedSessionState): void {
+    this.latestSharedState = sharedState;
+    const remoteEpoch = sharedState.leader?.epoch ?? 0;
+    if (remoteEpoch > this.leaderEpoch) {
+      this.leaderEpoch = remoteEpoch;
+    }
     this.isApplyingSharedState = true;
     try {
       const configPatch: SessionTimeoutPartialConfig = {
@@ -738,7 +793,7 @@ export class SessionTimeoutService {
     const leaderId = this.leaderElection?.leaderId?.();
     const leaderInfo =
       config.syncMode === 'leader' && leaderId
-        ? { id: leaderId, heartbeatAt: now, epoch: 0 }
+        ? { id: leaderId, heartbeatAt: now, epoch: this.leaderEpoch }
         : null;
 
     return {
@@ -778,6 +833,7 @@ export class SessionTimeoutService {
     }
 
     const state = this.buildSharedSessionState();
+    this.latestSharedState = state;
     const persist = options?.persist ?? true;
     const crossTab = options?.crossTab ?? true;
 
@@ -967,31 +1023,90 @@ export class SessionTimeoutService {
     const config = this.configSignal();
     const isLeader = this.leaderElection.isLeader();
     const leaderId = this.leaderElection.leaderId();
-    const previous = this.leaderState;
+    const previousRole = this.leaderState;
+    const previousLeaderId = this.lastKnownLeaderId;
+
     this.leaderState = isLeader;
+    this.lastKnownLeaderId = leaderId ?? null;
 
-    if (previous === null) {
-      if (isLeader && config.syncMode === 'leader') {
+    if (previousRole === null) {
+      if (config.syncMode === 'leader') {
+        if (isLeader) {
+          this.bumpLeaderEpoch();
+          this.broadcastSharedState();
+        } else if (!leaderId) {
+          this.requestLeaderSync('leader-missing', { force: true });
+        }
+      }
+      return;
+    }
+
+    if (previousRole !== isLeader) {
+      if (isLeader) {
+        this.bumpLeaderEpoch();
+        this.emitEvent('LeaderElected', { leaderId });
+        if (config.syncMode === 'leader') {
+          this.broadcastSharedState();
+        }
+      } else {
+        this.emitEvent('LeaderLost', { leaderId });
+        if (config.syncMode === 'leader') {
+          this.requestLeaderSync('leader-changed', { force: true });
+        }
+      }
+      return;
+    }
+
+    if (!isLeader && config.syncMode === 'leader') {
+      if (previousLeaderId !== this.lastKnownLeaderId) {
+        this.requestLeaderSync('leader-updated', { force: true });
+      }
+    }
+  }
+
+  private bumpLeaderEpoch(): void {
+    const remoteEpoch = this.latestSharedState?.leader?.epoch ?? 0;
+    const nextEpoch = Math.max(remoteEpoch + 1, this.leaderEpoch + 1, 1);
+    this.leaderEpoch = nextEpoch;
+  }
+
+  private requestLeaderSync(reason: string, options?: { force?: boolean }): void {
+    if (this.configSignal().syncMode !== 'leader') {
+      return;
+    }
+    const now = this.timeSource.now();
+    if (!options?.force && this.lastSyncRequestAt != null && now - this.lastSyncRequestAt < HEARTBEAT_INTERVAL_MS) {
+      return;
+    }
+    this.lastSyncRequestAt = now;
+    this.sharedStateCoordinator.requestSync(reason);
+    this.broadcastCrossTab('sync-request');
+  }
+
+  private handleVisibilityResume(reason: string): void {
+    if (this.leaderElection) {
+      this.leaderElection.electLeader();
+    }
+    const config = this.configSignal();
+    const now = this.timeSource.now();
+    const hiddenDuration = this.lastHiddenAt != null ? now - this.lastHiddenAt : 0;
+    this.lastHiddenAt = null;
+
+    if (!this.leaderElection || config.syncMode !== 'leader') {
+      return;
+    }
+
+    if (this.leaderElection.isLeader()) {
+      if (hiddenDuration >= LEADER_TTL_MS) {
         this.broadcastSharedState();
       }
       return;
     }
 
-    if (previous === isLeader) {
-      return;
-    }
-
-    if (isLeader) {
-      this.emitEvent('LeaderElected', { leaderId });
-      if (config.syncMode === 'leader') {
-        this.broadcastSharedState();
-      }
-    } else {
-      this.emitEvent('LeaderLost', { leaderId });
-      if (config.syncMode === 'leader') {
-        this.sharedStateCoordinator.requestSync('leader-changed');
-        this.broadcastCrossTab('sync-request');
-      }
+    const leaderInfo = this.latestSharedState?.leader;
+    const heartbeatStale = !leaderInfo || now - leaderInfo.heartbeatAt >= LEADER_TTL_MS;
+    if (hiddenDuration >= LEADER_TTL_MS || heartbeatStale) {
+      this.requestLeaderSync(reason, { force: true });
     }
   }
 

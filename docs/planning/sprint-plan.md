@@ -24,7 +24,7 @@
 - [ ] Checkpoint 3 – Leader Mode Rework
   - Sub-checkpoints:
     - [x] 3a Service integration with coordinator for leader ownership flow.
-    - [ ] 3b Leader lifecycle & failover handling enhancements.
+    - [x] 3b Leader lifecycle & failover handling enhancements.
     - [ ] 3c Leader-mode regression test suite rewrite.
 - [ ] Checkpoint 4 – Distributed Mode Implementation
   - Sub-checkpoints:

@@ -38,7 +38,7 @@ items:
 - id: cp3b-leader-lifecycle
   title: 3b Leader lifecycle & failover handling
   owner: codex
-  status: Next
+  status: Done
   notes: visibility/unload/sleep handling, leader election updates
   dependencies:
   - cp3a-leader-integration
