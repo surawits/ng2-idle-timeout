@@ -352,16 +352,20 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = payload as Record<string, unknown>;
-    if (typeof record.type !== 'string' || typeof record.sourceId !== 'string' || typeof record.at !== 'number') {
+    const type = record['type'];
+    const sourceId = record['sourceId'];
+    const at = record['at'];
+
+    if (typeof type !== 'string' || typeof sourceId !== 'string' || typeof at !== 'number') {
       return false;
     }
 
-    if (record.type === 'state') {
-      const stateCandidate = record.state;
+    if (type === 'state') {
+      const stateCandidate = record['state'];
       return typeof stateCandidate === 'object' && stateCandidate !== null;
     }
 
-    if (record.type === 'request-sync') {
+    if (type === 'request-sync') {
       return true;
     }
 
@@ -373,17 +377,23 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = candidate as Record<string, unknown>;
-    if (record.version !== SHARED_STATE_VERSION) {
+    const version = record['version'];
+    if (version !== SHARED_STATE_VERSION) {
       return false;
     }
-    if (!this.isSharedSnapshot(record.snapshot) || !this.isSharedConfig(record.config) || !this.isSharedMetadata(record.metadata)) {
+    const snapshot = record['snapshot'];
+    const config = record['config'];
+    const metadata = record['metadata'];
+    if (!this.isSharedSnapshot(snapshot) || !this.isSharedConfig(config) || !this.isSharedMetadata(metadata)) {
       return false;
     }
-    if (record.leader != null && !this.isLeaderInfo(record.leader)) {
+    const leader = record['leader'];
+    if (leader != null && !this.isLeaderInfo(leader)) {
       return false;
     }
-    const syncMode = record.syncMode;
-    return typeof record.updatedAt === 'number' && (syncMode === 'leader' || syncMode === 'distributed');
+    const syncMode = record['syncMode'];
+    const updatedAt = record['updatedAt'];
+    return typeof updatedAt === 'number' && (syncMode === 'leader' || syncMode === 'distributed');
   }
 
   private isSharedSnapshot(snapshot: unknown): snapshot is SharedSessionState['snapshot'] {
@@ -391,13 +401,19 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = snapshot as Record<string, unknown>;
+    const state = record['state'];
+    const remainingMs = record['remainingMs'];
+    const idleStartAt = record['idleStartAt'];
+    const countdownEndAt = record['countdownEndAt'];
+    const lastActivityAt = record['lastActivityAt'];
+    const paused = record['paused'];
     return (
-      typeof record.state === 'string' &&
-      typeof record.remainingMs === 'number' &&
-      (record.idleStartAt === null || typeof record.idleStartAt === 'number') &&
-      (record.countdownEndAt === null || typeof record.countdownEndAt === 'number') &&
-      (record.lastActivityAt === null || typeof record.lastActivityAt === 'number') &&
-      typeof record.paused === 'boolean'
+      typeof state === 'string' &&
+      typeof remainingMs === 'number' &&
+      (idleStartAt === null || typeof idleStartAt === 'number') &&
+      (countdownEndAt === null || typeof countdownEndAt === 'number') &&
+      (lastActivityAt === null || typeof lastActivityAt === 'number') &&
+      typeof paused === 'boolean'
     );
   }
 
@@ -406,19 +422,27 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = config as unknown as Record<string, unknown>;
-    const resumeBehavior = record.resumeBehavior;
+    const resumeBehavior = record['resumeBehavior'];
+    const idleGraceMs = record['idleGraceMs'];
+    const countdownMs = record['countdownMs'];
+    const warnBeforeMs = record['warnBeforeMs'];
+    const activityResetCooldownMs = record['activityResetCooldownMs'];
+    const storageKeyPrefix = record['storageKeyPrefix'];
+    const syncMode = record['syncMode'];
+    const ignoreUserActivityWhenPaused = record['ignoreUserActivityWhenPaused'];
+    const allowManualExtendWhenExpired = record['allowManualExtendWhenExpired'];
     const resumeValid =
       resumeBehavior === undefined || resumeBehavior === 'manual' || resumeBehavior === 'autoOnServerSync';
     return (
-      typeof record.idleGraceMs === 'number' &&
-      typeof record.countdownMs === 'number' &&
-      typeof record.warnBeforeMs === 'number' &&
-      typeof record.activityResetCooldownMs === 'number' &&
-      typeof record.storageKeyPrefix === 'string' &&
-      typeof record.syncMode === 'string' &&
+      typeof idleGraceMs === 'number' &&
+      typeof countdownMs === 'number' &&
+      typeof warnBeforeMs === 'number' &&
+      typeof activityResetCooldownMs === 'number' &&
+      typeof storageKeyPrefix === 'string' &&
+      typeof syncMode === 'string' &&
       resumeValid &&
-      typeof record.ignoreUserActivityWhenPaused === 'boolean' &&
-      typeof record.allowManualExtendWhenExpired === 'boolean'
+      typeof ignoreUserActivityWhenPaused === 'boolean' &&
+      typeof allowManualExtendWhenExpired === 'boolean'
     );
   }
 
@@ -427,13 +451,16 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = config as unknown as Record<string, unknown>;
+    const revision = record['revision'];
+    const logicalClock = record['logicalClock'];
+    const writerId = record['writerId'];
     return (
-      typeof record.revision === 'number' &&
-      Number.isFinite(record.revision) &&
-      typeof record.logicalClock === 'number' &&
-      Number.isFinite(record.logicalClock) &&
-      typeof record.writerId === 'string' &&
-      record.writerId.length > 0
+      typeof revision === 'number' &&
+      Number.isFinite(revision) &&
+      typeof logicalClock === 'number' &&
+      Number.isFinite(logicalClock) &&
+      typeof writerId === 'string' &&
+      writerId.length > 0
     );
   }
 
@@ -442,7 +469,11 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = metadata as Record<string, unknown>;
-    const operation = record.operation;
+    const operation = record['operation'];
+    const revision = record['revision'];
+    const logicalClock = record['logicalClock'];
+    const writerId = record['writerId'];
+    const causalityToken = record['causalityToken'];
     const operationValid =
       operation === 'bootstrap' ||
       operation === 'reset-by-activity' ||
@@ -453,14 +484,14 @@ export class SharedStateCoordinatorService {
       operation === 'expire' ||
       operation === 'config-change';
     return (
-      typeof record.revision === 'number' &&
-      Number.isFinite(record.revision) &&
-      typeof record.logicalClock === 'number' &&
-      Number.isFinite(record.logicalClock) &&
-      typeof record.writerId === 'string' &&
-      record.writerId.length > 0 &&
-      typeof record.causalityToken === 'string' &&
-      record.causalityToken.length > 0 &&
+      typeof revision === 'number' &&
+      Number.isFinite(revision) &&
+      typeof logicalClock === 'number' &&
+      Number.isFinite(logicalClock) &&
+      typeof writerId === 'string' &&
+      writerId.length > 0 &&
+      typeof causalityToken === 'string' &&
+      causalityToken.length > 0 &&
       operationValid
     );
   }
@@ -470,10 +501,13 @@ export class SharedStateCoordinatorService {
       return false;
     }
     const record = leader as Record<string, unknown>;
+    const id = record['id'];
+    const heartbeatAt = record['heartbeatAt'];
+    const epoch = record['epoch'];
     return (
-      typeof record.id === 'string' &&
-      typeof record.heartbeatAt === 'number' &&
-      typeof record.epoch === 'number'
+      typeof id === 'string' &&
+      typeof heartbeatAt === 'number' &&
+      typeof epoch === 'number'
     );
   }
 }

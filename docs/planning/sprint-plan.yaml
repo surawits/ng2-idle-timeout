@@ -73,7 +73,7 @@ items:
 - id: cp5-playground
   title: Checkpoint 5 – Playground & Integration Updates
   owner: codex
-  status: Next
+  status: Done
   notes: multi-tab demo controls, manual validation script
   dependencies:
   - cp4c-distributed-tests

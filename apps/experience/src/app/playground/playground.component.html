@@ -41,6 +41,20 @@
 
       <div class="row g-3">
         <div class="col-12 col-md-6">
+          <label class="form-label" for="syncMode">Sync mode</label>
+          <select
+            id="syncMode"
+            class="form-select"
+            [(ngModel)]="selectedSyncMode"
+            (ngModelChange)="onSyncModeChange($event)"
+          >
+            <option *ngFor="let option of syncModeOptions" [ngValue]="option.value">{{ option.label }}</option>
+          </select>
+          <small class="text-muted d-block mt-1">
+            Leader mode elects a single writer; distributed converges updates via Lamport ordering.
+          </small>
+        </div>
+        <div class="col-12 col-md-6">
           <label class="form-label" for="idle">Idle grace (seconds)</label>
           <input
             id="idle"
@@ -327,6 +341,105 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body d-flex flex-column gap-3">
+      <div>
+        <h3 class="card-title">Shared state diagnostics</h3>
+        <h6 class="card-subtitle text-muted">Track distributed metadata and coordinate manual tests</h6>
+      </div>
+
+      <div class="d-flex flex-column flex-md-row gap-3 justify-content-between">
+        <div>
+          <span class="text-muted text-uppercase small d-block">Local source ID</span>
+          <code class="font-monospace">{{ coordinatorSourceId }}</code>
+        </div>
+        <div>
+          <span class="text-muted text-uppercase small d-block">Last shared update</span>
+          <span class="font-monospace">
+            {{ sharedStateUpdatedAt() ? (sharedStateUpdatedAt() | date: 'dd MMM yyyy HH:mm:ss') : '—' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm" (click)="requestSharedStateSync('playground-inspect')">
+          <i class="bi bi-broadcast"></i>
+          Request sync
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="refreshSharedStateSnapshot()">
+          <i class="bi bi-arrow-clockwise"></i>
+          Reload snapshot
+        </button>
+        <button type="button" class="btn btn-outline-danger btn-sm" (click)="clearSharedStateCache()">
+          <i class="bi bi-trash"></i>
+          Clear persisted state
+        </button>
+      </div>
+
+      <ng-container *ngIf="sharedState() as shared; else noSharedState">
+        <div
+          *ngIf="shared.config.syncMode !== selectedSyncMode"
+          class="alert alert-warning small mb-0"
+          role="alert"
+        >
+          Shared state reports <strong>{{ syncModeLabel(shared.config.syncMode) }}</strong> while the playground is
+          configured for <strong>{{ syncModeLabel(selectedSyncMode) }}</strong>. Switch tabs or toggle the mode to
+          reconcile.
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-6">
+            <div class="border rounded-3 p-3 h-100">
+              <h6 class="text-uppercase text-muted small mb-2">Snapshot metadata</h6>
+              <table class="table table-sm align-middle mb-0">
+                <tbody>
+                  <tr *ngFor="let item of sharedMetadataRows()">
+                    <th scope="row" class="text-muted small">{{ item.label }}</th>
+                    <td class="font-monospace small">{{ item.value }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="border rounded-3 p-3 h-100">
+              <h6 class="text-uppercase text-muted small mb-2">Config metadata</h6>
+              <table class="table table-sm align-middle mb-0">
+                <tbody>
+                  <tr *ngFor="let item of sharedConfigRows()">
+                    <th scope="row" class="text-muted small">{{ item.label }}</th>
+                    <td class="font-monospace small">{{ item.value }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-4 small text-muted">
+          <div>
+            <span class="text-uppercase d-block">Shared state</span>
+            <span class="badge text-bg-light text-dark">{{ shared.snapshot.state }}</span>
+          </div>
+          <div>
+            <span class="text-uppercase d-block">Remaining</span>
+            <span class="font-monospace">{{ shared.snapshot.remainingMs }}&nbsp;ms</span>
+          </div>
+          <div *ngIf="sharedLeaderInfo() as leader">
+            <span class="text-uppercase d-block">Leader info</span>
+            <span class="font-monospace">{{ leader.id }} • epoch {{ leader.epoch }} • HB {{ leader.heartbeatAt | date: 'HH:mm:ss' }}</span>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #noSharedState>
+        <p class="text-muted small mb-0">
+          No shared snapshot captured yet. Start the session or request a sync to populate distributed metadata.
+        </p>
+      </ng-template>
     </div>
   </div>
 </div>

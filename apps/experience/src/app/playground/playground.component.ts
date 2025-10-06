@@ -4,9 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
   SessionTimeoutService,
+  SharedStateCoordinatorService,
   DOM_ACTIVITY_EVENT_NAMES,
   DEFAULT_SESSION_TIMEOUT_CONFIG,
-  type DomActivityEventName
+  type DomActivityEventName,
+  type SessionSyncMode,
+  type SessionTimeoutConfig,
+  type SharedSessionState
 } from 'ng2-idle-timeout';
 
 interface EventView {
@@ -25,6 +29,12 @@ interface ActivityView {
   detail?: string;
 }
 
+interface MetadataItem {
+  label: string;
+  value: string;
+  hint?: string;
+}
+
 @Component({
   selector: 'experience-playground',
   standalone: true,
@@ -36,13 +46,23 @@ export class PlaygroundComponent {
   private readonly sessionTimeout = inject(SessionTimeoutService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly sharedStateCoordinator = inject(SharedStateCoordinatorService);
   private readonly initialConfig = this.sessionTimeout.getConfig();
+  private readonly syncModeStorageKey = 'experience-playground-sync-mode';
+
+  readonly coordinatorSourceId = this.sharedStateCoordinator.getSourceId();
 
   readonly domEventOptions = DOM_ACTIVITY_EVENT_NAMES;
   readonly defaultDomEventSelection = new Set<DomActivityEventName>(
     DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents
   );
   domEventSelection = new Set<DomActivityEventName>(this.initialConfig.domActivityEvents);
+
+  readonly syncModeOptions: Array<{ value: SessionSyncMode; label: string }> = [
+    { value: 'leader', label: 'Leader (single writer)' },
+    { value: 'distributed', label: 'Distributed (multi-writer)' }
+  ];
+  selectedSyncMode: SessionSyncMode = this.initialConfig.syncMode;
 
   idleGraceSeconds = 60;
   countdownSeconds = 300;
@@ -63,6 +83,53 @@ export class PlaygroundComponent {
   private readonly serviceActive = signal(false);
 
   private readonly configState = signal(this.initialConfig);
+
+  private readonly sharedStateInternal = signal<SharedSessionState | null>(null);
+  readonly sharedState = this.sharedStateInternal.asReadonly();
+
+  readonly sharedStateUpdatedAt = computed(() => {
+    const state = this.sharedState();
+    return state ? new Date(state.updatedAt) : null;
+  });
+
+  readonly sharedMetadataRows = computed<MetadataItem[]>(() => {
+    const state = this.sharedState();
+    if (!state) {
+      return [];
+    }
+    return [
+      { label: 'Operation', value: this.formatOperation(state.metadata.operation) },
+      { label: 'Revision', value: state.metadata.revision.toString() },
+      { label: 'Logical clock', value: state.metadata.logicalClock.toString() },
+      { label: 'Writer ID', value: state.metadata.writerId },
+      { label: 'Causality token', value: state.metadata.causalityToken }
+    ];
+  });
+
+  readonly sharedConfigRows = computed<MetadataItem[]>(() => {
+    const state = this.sharedState();
+    if (!state) {
+      return [];
+    }
+    return [
+      { label: 'Sync mode', value: this.syncModeLabel(state.config.syncMode) },
+      { label: 'Revision', value: state.config.revision.toString() },
+      { label: 'Logical clock', value: state.config.logicalClock.toString() },
+      { label: 'Writer ID', value: state.config.writerId }
+    ];
+  });
+
+  readonly sharedLeaderInfo = computed(() => {
+    const state = this.sharedState();
+    if (!state?.leader) {
+      return null;
+    }
+    return {
+      id: state.leader.id,
+      heartbeatAt: state.leader.heartbeatAt,
+      epoch: state.leader.epoch
+    };
+  });
 
   readonly snapshot = computed(() => this.sessionTimeout.getSnapshot());
   readonly sessionState = computed(() => this.snapshot().state);
@@ -149,10 +216,30 @@ export class PlaygroundComponent {
   });
 
   constructor() {
+    const storedSyncMode = this.readStoredSyncMode();
+    if (storedSyncMode) {
+      this.selectedSyncMode = storedSyncMode;
+    }
+
     this.applyConfig();
     this.sessionTimeout.stop();
 
+    const persistedState = this.sharedStateCoordinator.readPersistedState();
+    if (persistedState) {
+      this.sharedStateInternal.set(persistedState);
+    }
+
+    const sharedStateSub = this.sharedStateCoordinator.updates$.subscribe(message => {
+      if (message.type === 'state') {
+        this.sharedStateInternal.set(message.state);
+      }
+    });
+
     const eventsSub = this.sessionTimeout.events$.subscribe(event => {
+      if (event.type === 'ConfigChanged') {
+        this.syncLocalConfigInputs(this.sessionTimeout.getConfig());
+      }
+
       if (!this.serviceActive()) {
         if (event.type !== 'Stopped') {
           this.sessionTimeout.stop();
@@ -184,6 +271,7 @@ export class PlaygroundComponent {
     this.destroyRef.onDestroy(() => {
       eventsSub.unsubscribe();
       activitySub.unsubscribe();
+      sharedStateSub.unsubscribe();
     });
   }
 
@@ -195,11 +283,11 @@ export class PlaygroundComponent {
       warnBeforeMs: this.warnBeforeSeconds * 1000,
       activityResetCooldownMs: this.activityCooldownSeconds * 1000,
       resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',
-      domActivityEvents
+      domActivityEvents,
+      syncMode: this.selectedSyncMode
     });
     const nextConfig = this.sessionTimeout.getConfig();
-    this.configState.set(nextConfig);
-    this.domEventSelection = new Set<DomActivityEventName>(nextConfig.domActivityEvents);
+    this.syncLocalConfigInputs(nextConfig);
     if (!this.serviceActive()) {
       this.sessionTimeout.stop();
     }
@@ -218,6 +306,29 @@ export class PlaygroundComponent {
       this.domEventSelection.delete(event);
     }
     this.applyConfig();
+  }
+
+  onSyncModeChange(mode: SessionSyncMode | string): void {
+    if (mode === 'leader' || mode === 'distributed') {
+      this.selectedSyncMode = mode;
+      this.persistSyncMode(mode);
+      this.applyConfig();
+      this.requestSharedStateSync('sync-mode-change');
+    }
+  }
+
+  requestSharedStateSync(reason?: string): void {
+    this.sharedStateCoordinator.requestSync(reason ?? 'playground');
+  }
+
+  refreshSharedStateSnapshot(): void {
+    const state = this.sharedStateCoordinator.readPersistedState();
+    this.sharedStateInternal.set(state);
+  }
+
+  clearSharedStateCache(): void {
+    this.sharedStateCoordinator.clearPersistedState();
+    this.sharedStateInternal.set(null);
   }
 
   domEventLabel(event: DomActivityEventName): string {
@@ -251,6 +362,18 @@ export class PlaygroundComponent {
 
   isDefaultDomEvent(event: DomActivityEventName): boolean {
     return this.defaultDomEventSelection.has(event);
+  }
+
+  private syncLocalConfigInputs(config: SessionTimeoutConfig): void {
+    this.configState.set(config);
+    this.idleGraceSeconds = Math.round(config.idleGraceMs / 1000);
+    this.countdownSeconds = Math.round(config.countdownMs / 1000);
+    this.warnBeforeSeconds = Math.round(config.warnBeforeMs / 1000);
+    this.activityCooldownSeconds = Math.round(config.activityResetCooldownMs / 1000);
+    this.autoResume = config.resumeBehavior !== 'manual';
+    this.domEventSelection = new Set<DomActivityEventName>(config.domActivityEvents);
+    this.selectedSyncMode = config.syncMode;
+    this.persistSyncMode(config.syncMode);
   }
 
   private currentDomActivityEvents(): DomActivityEventName[] {
@@ -394,5 +517,39 @@ export class PlaygroundComponent {
       summary,
       detail: detailEntries.length > 0 ? detailEntries.join(', ') : undefined
     };
+  }
+
+  private readStoredSyncMode(): SessionSyncMode | null {
+    try {
+      const globalRef = globalThis as unknown as { localStorage?: Storage };
+      const raw = globalRef?.localStorage?.getItem(this.syncModeStorageKey) ?? null;
+      if (raw === 'leader' || raw === 'distributed') {
+        return raw;
+      }
+    } catch {
+      // Storage access can fail in private browsing or server contexts.
+    }
+    return null;
+  }
+
+  private persistSyncMode(mode: SessionSyncMode): void {
+    try {
+      const globalRef = globalThis as unknown as { localStorage?: Storage };
+      globalRef?.localStorage?.setItem(this.syncModeStorageKey, mode);
+    } catch {
+      // Swallow storage errors; the playground still works without persistence.
+    }
+  }
+
+  syncModeLabel(mode: SessionSyncMode): string {
+    const option = this.syncModeOptions.find(item => item.value === mode);
+    return option?.label ?? mode;
+  }
+
+  private formatOperation(operation: SharedSessionState['metadata']['operation']): string {
+    return operation
+      .split('-')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
   }
 }

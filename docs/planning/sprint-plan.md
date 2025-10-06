@@ -31,7 +31,7 @@
     - [x] 4a Consensus rules and conflict-resolution algorithm (Done).
     - [x] 4b Service wiring for distributed reconciliation and activity propagation (Done).
     - [x] 4c Distributed-mode test coverage.
-- [ ] Checkpoint 5 – Playground & Integration Updates
+- [x] Checkpoint 5 – Playground & Integration Updates
   - Deliverables: multi-tab demo controls, manual validation script, optional smoke tests.
 - [ ] Checkpoint 6 – Documentation, Migration, Verification
   - Deliverables: README updates, migration notes, release notes, verification log, planning sync.
