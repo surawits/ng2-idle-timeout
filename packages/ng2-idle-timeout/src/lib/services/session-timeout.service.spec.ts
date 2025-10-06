@@ -1,4 +1,4 @@
-import { EnvironmentInjector } from '@angular/core';
+import { EnvironmentInjector, computed, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TestBed, fakeAsync, flushMicrotasks, discardPeriodicTasks } from '@angular/core/testing';
 import { Subject } from 'rxjs';
@@ -10,10 +10,62 @@ import type { SessionTimeoutConfig } from '../models/session-timeout-config';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
+import type { CrossTabMessage } from '../models/cross-tab-message';
+import { SHARED_STATE_VERSION, type SharedSessionState, type SharedStateMessage } from '../models/session-shared-state';
+import { SharedStateCoordinatorService } from './shared-state-coordinator.service';
+import { LeaderElectionService, HEARTBEAT_INTERVAL_MS, LEADER_TTL_MS } from './leader-election.service';
+import type { BroadcastAdapter } from '../utils/broadcast-channel';
 import { TimeSourceService } from './time-source.service';
 import { ActivityDomService } from './activity-dom.service';
 import { ActivityRouterService } from './activity-router.service';
 import { ServerTimeService } from './server-time.service';
+
+
+jest.mock('../utils/broadcast-channel', () => {
+  class MockBroadcastAdapter {
+    readonly messages: unknown[] = [];
+    private readonly listeners = new Set<(message: MessageEvent) => void>();
+
+    constructor(readonly name: string) {}
+
+    publish(message: unknown): void {
+      this.messages.push(message);
+      this.listeners.forEach(listener => listener({ data: message } as MessageEvent));
+    }
+
+    close(): void {
+      this.listeners.clear();
+    }
+
+    subscribe(callback: (message: MessageEvent) => void): void {
+      this.listeners.add(callback);
+    }
+
+    emit(message: unknown): void {
+      this.listeners.forEach(listener => listener({ data: message } as MessageEvent));
+    }
+  }
+
+  const channels = new Map<string, MockBroadcastAdapter>();
+
+  return {
+    createBroadcastChannel: (name: string) => {
+      const adapter = new MockBroadcastAdapter(name);
+      channels.set(name, adapter);
+      return adapter;
+    },
+    __getChannel: (name: string) => channels.get(name),
+    __resetChannels: () => {
+      channels.forEach(channel => channel.close());
+      channels.clear();
+    }
+  };
+});
+
+type BroadcastMockModule = {
+  __getChannel: (name: string) => (BroadcastAdapter & { messages: unknown[]; emit(message: unknown): void }) | undefined;
+  __resetChannels: () => void;
+};
 
 class MockTimeSourceService {
   private current = 0;
@@ -71,6 +123,51 @@ class StubServerTimeService {
   }
 }
 
+class SharedStateCoordinatorStub {
+  updateConfig = jest.fn();
+  publishState = jest.fn();
+  requestSync = jest.fn();
+  readPersistedState = jest.fn<SharedSessionState | null, []>(() => null);
+  clearPersistedState = jest.fn();
+  private readonly updatesSubject = new Subject<SharedStateMessage>();
+  readonly updates$ = this.updatesSubject.asObservable();
+
+  emit(message: SharedStateMessage): void {
+    this.updatesSubject.next(message);
+  }
+}
+
+class StubLeaderElectionService {
+  readonly tabId = 'local-tab';
+  private readonly leaderSignalInternal = signal<string | null>(null);
+  private readonly isLeaderComputed = computed(() => this.leaderSignalInternal() === this.tabId);
+
+  updateConfig = jest.fn();
+
+  isLeader(): boolean {
+    return this.isLeaderComputed();
+  }
+
+  leaderId(): string | null {
+    return this.leaderSignalInternal();
+  }
+
+  electLeader(): void {
+    const current = this.leaderSignalInternal();
+    if (current == null || current === this.tabId) {
+      this.leaderSignalInternal.set(this.tabId);
+    }
+  }
+
+  stepDown(): void {
+    this.leaderSignalInternal.set(null);
+  }
+
+  assumeLeader(id: string | null): void {
+    this.leaderSignalInternal.set(id);
+  }
+}
+
 describe('SessionTimeoutService', () => {
   let injector: EnvironmentInjector;
   let service: SessionTimeoutService;
@@ -78,6 +175,11 @@ describe('SessionTimeoutService', () => {
   let domService: StubActivityDomService;
   let routerService: StubActivityRouterService;
   let serverTime: StubServerTimeService;
+  let sharedCoordinator: SharedStateCoordinatorStub;
+  let leaderElection: StubLeaderElectionService;
+  let broadcastMock: BroadcastMockModule;
+  let requestSyncMock: jest.Mock;
+  let publishStateMock: jest.Mock;
   const baseConfig: SessionTimeoutConfig = {
     idleGraceMs: 200,
     countdownMs: 1000,
@@ -123,6 +225,9 @@ describe('SessionTimeoutService', () => {
   };
 
   beforeEach(() => {
+    broadcastMock = jest.requireMock('../utils/broadcast-channel') as BroadcastMockModule;
+    broadcastMock.__resetChannels();
+
     domService = new StubActivityDomService();
     routerService = new StubActivityRouterService();
     serverTime = new StubServerTimeService();
@@ -134,16 +239,25 @@ describe('SessionTimeoutService', () => {
         { provide: SESSION_TIMEOUT_CONFIG, useValue: baseConfig },
         { provide: ActivityDomService, useValue: domService },
         { provide: ActivityRouterService, useValue: routerService },
-        { provide: ServerTimeService, useValue: serverTime }
+        { provide: ServerTimeService, useValue: serverTime },
+        { provide: SharedStateCoordinatorService, useClass: SharedStateCoordinatorStub },
+        { provide: LeaderElectionService, useClass: StubLeaderElectionService }
       ]
     });
 
     injector = TestBed.inject(EnvironmentInjector);
     service = TestBed.inject(SessionTimeoutService);
     time = TestBed.inject(TimeSourceService) as unknown as MockTimeSourceService;
+    sharedCoordinator = TestBed.inject(SharedStateCoordinatorService) as unknown as SharedStateCoordinatorStub;
+    leaderElection = TestBed.inject(LeaderElectionService) as unknown as StubLeaderElectionService;
+    requestSyncMock = sharedCoordinator.requestSync;
+    publishStateMock = sharedCoordinator.publishState;
   });
 
   afterEach(() => {
+    requestSyncMock?.mockReset();
+    publishStateMock?.mockReset();
+    broadcastMock.__resetChannels();
     localStorage.clear();
   });
 
@@ -174,6 +288,57 @@ describe('SessionTimeoutService', () => {
   function advanceAndTick(ms: number): void {
     time.advance(ms);
     manualTick();
+  }
+
+  async function flushAsync(iterations = 3): Promise<void> {
+    for (let index = 0; index < iterations; index += 1) {
+      await Promise.resolve();
+    }
+  }
+
+  function setLatestSharedState(state: SharedSessionState | null): void {
+    (service as unknown as { latestSharedState: SharedSessionState | null }).latestSharedState = state;
+  }
+
+  function setLastHiddenAt(timestamp: number | null): void {
+    (service as unknown as { lastHiddenAt: number | null }).lastHiddenAt = timestamp;
+  }
+
+  function resumeVisibility(reason: string): void {
+    (service as unknown as { handleVisibilityResume: (reason: string) => void }).handleVisibilityResume(reason);
+  }
+
+  function requestLeaderSync(reason: string, options?: { force?: boolean }): void {
+    (service as unknown as { requestLeaderSync: (reason: string, options?: { force?: boolean }) => void }).requestLeaderSync(reason, options);
+  }
+
+  function buildSharedState(overrides?: Partial<SharedSessionState>): SharedSessionState {
+    const now = time.now();
+    return {
+      version: SHARED_STATE_VERSION,
+      updatedAt: overrides?.updatedAt ?? now,
+      syncMode: overrides?.syncMode ?? 'leader',
+      leader: overrides?.leader ?? null,
+      snapshot: overrides?.snapshot ?? {
+        state: 'IDLE',
+        remainingMs: baseConfig.countdownMs,
+        idleStartAt: now,
+        countdownEndAt: now + baseConfig.countdownMs,
+        lastActivityAt: now,
+        paused: false
+      },
+      config: overrides?.config ?? {
+        idleGraceMs: baseConfig.idleGraceMs,
+        countdownMs: baseConfig.countdownMs,
+        warnBeforeMs: baseConfig.warnBeforeMs,
+        activityResetCooldownMs: baseConfig.activityResetCooldownMs,
+        storageKeyPrefix: baseConfig.storageKeyPrefix,
+        syncMode: overrides?.syncMode ?? baseConfig.syncMode,
+        resumeBehavior: baseConfig.resumeBehavior,
+        ignoreUserActivityWhenPaused: baseConfig.ignoreUserActivityWhenPaused,
+        allowManualExtendWhenExpired: baseConfig.allowManualExtendWhenExpired
+      }
+    };
   }
 
   it('starts in IDLE and enters countdown after idle grace period', () => {
@@ -527,6 +692,99 @@ describe('SessionTimeoutService', () => {
       expect(restoredSnapshot.remainingMs).toBeLessThanOrEqual(baseConfig.warnBeforeMs);
     }
   });
+
+  it('requests leader sync when no leader is known on init', () => {
+    const reasons = requestSyncMock.mock.calls.map(call => call[0]);
+    expect(reasons).toContain('leader-missing');
+  });
+
+  it('requests sync and notifies followers when stepping down from leadership', async () => {
+    const messages: CrossTabMessage[] = [];
+    service.crossTab$.subscribe(message => messages.push(message));
+
+    await flushAsync();
+    leaderElection.electLeader();
+    await flushAsync();
+    requestSyncMock.mockClear();
+    messages.length = 0;
+
+    leaderElection.stepDown();
+    await flushAsync();
+
+    expect(requestSyncMock).toHaveBeenCalledWith('leader-changed');
+    expect(messages.some(message => message.type === 'sync-request')).toBe(true);
+  });
+
+  it('requests sync when visibility resumes after extended hidden period', async () => {
+    await flushAsync();
+    leaderElection.assumeLeader('remote-tab');
+    const remoteState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: time.now() - (LEADER_TTL_MS + 50), epoch: 3 }
+    });
+    setLatestSharedState(remoteState);
+    setLastHiddenAt(time.now() - (LEADER_TTL_MS + 10));
+
+    requestSyncMock.mockClear();
+    resumeVisibility('visibilitychange');
+
+    expect(requestSyncMock).toHaveBeenCalledWith('visibilitychange');
+  });
+
+  it('throttles leader sync requests when not forced', async () => {
+    const outbound: CrossTabMessage[] = [];
+    service.crossTab$.subscribe(message => outbound.push(message));
+
+    await flushAsync();
+    requestSyncMock.mockClear();
+    outbound.length = 0;
+
+    time.advance(HEARTBEAT_INTERVAL_MS + 1);
+    requestLeaderSync('manual-first');
+    expect(requestSyncMock).toHaveBeenCalledWith('manual-first');
+    const firstSyncRequest = outbound.find(message => message.type === 'sync-request');
+    expect(firstSyncRequest).toBeDefined();
+
+    requestSyncMock.mockClear();
+    outbound.length = 0;
+
+    requestLeaderSync('manual-repeat');
+    expect(requestSyncMock).not.toHaveBeenCalled();
+    expect(outbound.length).toBe(0);
+
+    time.advance(HEARTBEAT_INTERVAL_MS + 1);
+    requestLeaderSync('manual-after-wait');
+    expect(requestSyncMock).toHaveBeenCalledWith('manual-after-wait');
+  });
+
+  it('increments leader epoch when taking leadership after remote shared state', async () => {
+    await flushAsync();
+    leaderElection.assumeLeader('remote-tab');
+    const remoteState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: time.now(), epoch: 4 }
+    });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: remoteState
+    });
+
+    await flushAsync();
+    publishStateMock.mockClear();
+
+    leaderElection.stepDown();
+    await flushAsync();
+    leaderElection.electLeader();
+    await flushAsync();
+
+    const leaderStates = publishStateMock.mock.calls
+      .map(call => call[0] as SharedSessionState)
+      .filter(state => state.leader?.id === leaderElection.tabId);
+
+    expect(leaderStates.length).toBeGreaterThan(0);
+    expect(leaderStates.pop()?.leader?.epoch).toBe(5);
+  });
+
 });
 
 

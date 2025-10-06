@@ -209,6 +209,18 @@ describe('SessionTimeoutService cross-tab sync', () => {
     document.dispatchEvent(new Event('visibilitychange'));
   }
 
+  function writeLeaderRecord(id: string, updatedAt: number = Date.now()): void {
+    const payload = JSON.stringify({ id, updatedAt });
+    localStorage.setItem(leaderKey, payload);
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: leaderKey,
+        newValue: payload,
+        storageArea: localStorage
+      })
+    );
+  }
+
   function snapshot(): SessionSnapshot {
     return service.getSnapshot();
   }
@@ -605,6 +617,209 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(syncRequest).toBeDefined();
 
     sub.unsubscribe();
+  });
+
+  it('requests sync when visibility resumes when remote heartbeat is stale', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    const outbound: CrossTabMessage[] = [];
+    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+
+    service.start();
+    await flushAsync();
+    leader.stepDown();
+    await flushAsync();
+    writeLeaderRecord('remote-tab');
+    await flushAsync();
+
+    const staleState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: time.now() - (LEADER_TTL_MS + 25), epoch: 3 }
+    });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: staleState
+    });
+
+    await flushAsync();
+    requestSyncMock.mockClear();
+    outbound.length = 0;
+
+    const halfTtl = Math.floor(LEADER_TTL_MS / 2);
+    setVisibility('hidden');
+    time.advance(halfTtl);
+    setVisibility('visible');
+    await flushAsync();
+
+    expect(requestSyncMock).toHaveBeenCalledWith('visibilitychange');
+    const syncRequest = outbound.find(message => message.type === 'sync-request');
+    expect(syncRequest).toBeDefined();
+
+    sub.unsubscribe();
+  });
+
+  it('does not request sync when visibility resumes with fresh heartbeat', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    const outbound: CrossTabMessage[] = [];
+    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+
+    service.start();
+    await flushAsync();
+    leader.stepDown();
+    await flushAsync();
+    writeLeaderRecord('remote-tab');
+    await flushAsync();
+
+    const freshState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: time.now(), epoch: 2 }
+    });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: freshState
+    });
+
+    await flushAsync();
+    requestSyncMock.mockClear();
+    outbound.length = 0;
+
+    const halfTtl = Math.floor(LEADER_TTL_MS / 2);
+    setVisibility('hidden');
+    time.advance(halfTtl);
+    setVisibility('visible');
+    await flushAsync();
+
+    expect(requestSyncMock).not.toHaveBeenCalled();
+    const syncRequest = outbound.find(message => message.type === 'sync-request');
+    expect(syncRequest).toBeUndefined();
+
+    sub.unsubscribe();
+  });
+
+  it('broadcasts shared state when coordinator requests a sync while leader', async () => {
+    const outbound: CrossTabMessage[] = [];
+    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const leader = TestBed.inject(LeaderElectionService);
+
+    service.start();
+    await flushAsync();
+    leader.electLeader();
+    await flushAsync();
+
+    publishStateMock.mockClear();
+    sharedCoordinator.emit({
+      type: 'request-sync',
+      sourceId: 'remote-tab',
+      at: time.now()
+    });
+
+    await flushAsync();
+
+    expect(publishStateMock).toHaveBeenCalled();
+    const syncMessage = outbound.find(message => message.type === 'sync');
+    expect(syncMessage?.payload?.sharedState).toBeDefined();
+
+    sub.unsubscribe();
+  });
+
+  it('ignores coordinator sync requests when not the leader', async () => {
+    const outbound: CrossTabMessage[] = [];
+    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const leader = TestBed.inject(LeaderElectionService);
+
+    jest.spyOn(leader, 'isLeader').mockReturnValue(false);
+    jest.spyOn(leader, 'leaderId').mockReturnValue('remote-tab');
+
+    service.start();
+    await flushAsync();
+    leader.stepDown();
+    await flushAsync();
+    writeLeaderRecord('remote-tab');
+    await flushAsync();
+
+    publishStateMock.mockClear();
+    sharedCoordinator.emit({
+      type: 'request-sync',
+      sourceId: 'remote-tab',
+      at: time.now()
+    });
+
+    await flushAsync();
+
+    expect(publishStateMock).not.toHaveBeenCalled();
+    const syncMessage = outbound.find(message => message.type === 'sync');
+    expect(syncMessage).toBeUndefined();
+
+    sub.unsubscribe();
+  });
+
+  it('ignores cross-tab sync-request messages when follower', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    const outbound: CrossTabMessage[] = [];
+    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const channel = broadcastMock.__getChannel(channelName);
+
+    jest.spyOn(leader, 'isLeader').mockReturnValue(false);
+    jest.spyOn(leader, 'leaderId').mockReturnValue('remote-tab');
+
+    service.start();
+    await flushAsync();
+    leader.stepDown();
+    await flushAsync();
+    writeLeaderRecord('remote-tab');
+    await flushAsync();
+
+    publishStateMock.mockClear();
+    channel!.emit({
+      sourceId: 'remote-tab',
+      type: 'sync-request',
+      at: time.now()
+    } satisfies CrossTabMessage);
+
+    await flushAsync();
+
+    expect(publishStateMock).not.toHaveBeenCalled();
+    const syncMessages = outbound.filter(message => message.type === 'sync');
+    expect(syncMessages.length).toBe(0);
+
+    sub.unsubscribe();
+  });
+
+  it('applies shared state from coordinator updates to catch up follower snapshot', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+
+    service.start();
+    await flushAsync();
+    leader.stepDown();
+    await flushAsync();
+
+    const now = time.now();
+    const remoteState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: now, epoch: 4 },
+      snapshot: {
+        state: 'COUNTDOWN',
+        remainingMs: 450,
+        idleStartAt: now - 100,
+        countdownEndAt: now + 450,
+        lastActivityAt: now - 50,
+        paused: false
+      }
+    });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: now,
+      state: remoteState
+    });
+
+    await flushAsync();
+
+    const current = snapshot();
+    expect(current.state).toBe('COUNTDOWN');
+    expect(current.remainingMs).toBe(remoteState.snapshot.remainingMs);
+    expect(current.countdownEndAt).toBe(remoteState.snapshot.countdownEndAt);
+    expect(current.idleStartAt).toBe(remoteState.snapshot.idleStartAt);
   });
 
   it('increments leader epoch using latest shared state metadata', async () => {

@@ -45,7 +45,7 @@ items:
 - id: cp3c-leader-tests
   title: 3c Leader-mode regression test suite
   owner: codex
-  status: Next
+  status: Done
   notes: follower activity propagation, failover specs
   dependencies:
   - cp3b-leader-lifecycle
