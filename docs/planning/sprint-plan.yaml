@@ -78,9 +78,11 @@ items:
   dependencies:
   - cp4c-distributed-tests
 - id: cp6-docs
-  title: Checkpoint 6 – Documentation, Migration, Verification
+  title: Checkpoint 6 - Documentation, Migration, Verification
   owner: codex
-  status: Next
+  status: Done
   notes: README, migration notes, release notes, verification log, planning sync
   dependencies:
   - cp5-playground
+
+

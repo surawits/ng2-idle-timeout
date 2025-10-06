@@ -25,6 +25,7 @@
 
 - Consolidates idle detection, countdown warnings, and expiry flows across tabs and windows.
 - Survives reloads by persisting snapshots and configuration so state is restored instantly.
+- Coordinates leader and distributed writers with Lamport clocks for deterministic reconciliation.
 - Remains zoneless-friendly; activity sources are built on Angular signals.
 
 **How it fits together**
@@ -88,6 +89,8 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
      }
    ];
    ```
+
+> Switch to distributed coordination by setting `syncMode: 'distributed'` in the config. All tabs must opt in to keep consensus stable.
 
 3. **Register providers with your bootstrap**
 
@@ -206,24 +209,26 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
 
 ## Configuration Guide
 
-| Key                        | Default  | Description |
-|---------------------------|----------|-------------|
-| `idleGraceMs`             | `60000`  | How long a session may remain idle before the countdown starts. |
-| `countdownMs`             | `300000` | Time window for the user to extend or acknowledge before expiry. |
-| `warnBeforeMs`            | `60000`  | Threshold inside the countdown when WARN state triggers. |
-| `activityResetCooldownMs` | `5000`   | Minimum gap between automatic resets triggered by DOM/router noise. |
-| `domActivityEvents`       | `[ 'mousedown', 'click', 'wheel', 'scroll', 'keydown', 'keyup', 'touchstart', 'touchend', 'visibilitychange' ]` | DOM events that reset idle; add `mousemove`/`touchmove` when you explicitly want high-frequency sources. |
-| `resumeBehavior`          | `'manual'` | `'manual'` or `'autoOnServerSync'` for post-expiry recovery. |
-| `storageKeyPrefix`        | `'session'` | Namespacing prefix for persisted config and snapshots. |
-| `httpActivity.strategy`   | `'none'` | HTTP auto reset mode (`allowlist`, `headerFlag`, or `none`). |
-| `actionDelays.start`      | `0`      | Debounce for throttling start/stop/pause/resume actions. |
-| `logLevel`                | `'warn'` | Emit verbose diagnostics when set to `'debug'`. |
+| Key | Default | Description |
+|-----|---------|-------------|
+| `syncMode` | `'leader'` | Primary coordination mode. `'leader'` keeps a single writer; `'distributed'` lets any tab publish updates with Lamport ordering. |
+| `idleGraceMs` | `120000` | Milliseconds the session may remain idle before countdown begins. |
+| `countdownMs` | `3600000` | Countdown window (in ms) for the user to extend or acknowledge before expiry. |
+| `warnBeforeMs` | `300000` | Threshold inside the countdown that emits a WARN event and typically opens UI prompts. |
+| `activityResetCooldownMs` | `0` | Minimum gap between automatic resets triggered by DOM/router activity noise. |
+| `domActivityEvents` | `['mousedown','click','wheel','scroll','keydown','keyup','touchstart','touchend','visibilitychange']` | Events that count as user activity. Add `mousemove` or `touchmove` when you explicitly need high-frequency sources. |
+| `storageKeyPrefix` | `'ng2-idle-timeout'` | Namespace applied to persisted configuration and snapshots across tabs. |
+| `resumeBehavior` | `'manual'` | Keep manual resume (default) or enable `'autoOnServerSync'` when the backend confirms session validity. |
+| `httpActivity.strategy` | `'allowlist'` | HTTP auto-reset mode (`'allowlist'`, `'headerFlag'`, or `'aggressive'`). |
+| `logging` | `'warn'` | Emit verbose diagnostics when set to `'debug'` or `'trace'`. |
+| `ignoreUserActivityWhenPaused` | `false` | Ignore DOM/router activity while paused to prevent accidental resumes. |
+| `allowManualExtendWhenExpired` | `false` | Allow operators to extend even after expiry when business rules permit it. |
 
-**Timing cheat sheet**
+**Timing cheat sheet (example)**
 
 ```
 Idle            Countdown            Warn              Expired
-|<--60s-->||<-------------300s------------->|<--60s-->|
+|<--120s-->||<-------------300s------------->|<--60s-->|
            ^ idleGraceMs                   ^ warnBeforeMs
            |<----- activity cooldown ----->|
 ```
@@ -232,7 +237,27 @@ Idle            Countdown            Warn              Expired
 
 - **Call centre**: long idle (10 min), short warn (30 s), manual resume.
 - **Banking**: short idle (2 min), tight warn (15 s), resume only after server sync.
-- **Kiosk**: idle disabled, countdown only, auto resume when the POS heartbeat returns.\n\n### DOM activity include list
+- **Kiosk**: idle disabled, countdown only, auto resume when the POS heartbeat returns.
+
+### Sync modes
+
+- `'leader'`: default single-writer coordination. The elected tab owns persistence and rebroadcasts snapshots.
+- `'distributed'`: active-active coordination using Lamport clocks. Any tab may publish updates; conflicts resolve by logical clock then writer id.
+
+> Align `syncMode` across every tab before starting the service. Mismatches trigger reconciliation loops and warning banners in the playground.
+
+### Shared state metadata
+
+Distributed snapshots embed metadata so tabs can order updates deterministically:
+
+- `revision` and `logicalClock` track monotonic progress per snapshot.
+- `writerId` identifies the tab that produced the update.
+- `operation` clarifies whether the update came from activity, pause/resume, config changes, or expiry.
+- `causalityToken` de-duplicates retries and unlocks expect-reply flows.
+
+Version 3 of the shared state schema loads older persisted payloads and upgrades them automatically, but clearing storage during deployment avoids carrying stale Lamport clocks.
+
+### DOM activity include list
 
 `domActivityEvents` controls which DOM events count as user activity. The default set listens for clicks, wheel/scroll, key presses, touch start/end, and `visibilitychange` while leaving high-frequency sources such as `mousemove` and `touchmove` disabled to avoid noise. Add or remove events at bootstrap or at runtime:
 
@@ -249,7 +274,6 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 
 
 ---
-
 ## Service & API Reference
 
 ### SessionTimeoutService methods
@@ -279,9 +303,9 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 | `remainingMsSignal` | `remainingMs$` | `number` | Alias of total remaining time for legacy integrations. |
 | `isWarnSignal` | `isWarn$` | `boolean` | `true` when the countdown has entered the warn window. |
 | `isExpiredSignal` | `isExpired$` | `boolean` | `true` after expiry. |
-| – | `events$` | `Observable<SessionEvent>` | Structured lifecycle events (Started, Warn, Extended, etc.). |
-| – | `activity$` | `Observable<ActivityEvent>` | Activity resets originating from DOM/router/HTTP/manual triggers. |
-| – | `crossTab$` | `Observable<CrossTabMessage>` | Broadcast payloads when cross-tab sync is enabled. |
+| n/a | `events$` | `Observable<SessionEvent>` | Structured lifecycle events (Started, Warn, Extended, etc.). |
+| n/a | `activity$` | `Observable<ActivityEvent>` | Activity resets originating from DOM/router/HTTP/manual triggers. |
+| n/a | `crossTab$` | `Observable<CrossTabMessage>` | Broadcast payloads when cross-tab sync is enabled. |
 
 `remainingMs$` is the same stream instance as `totalRemainingMs$`, preserving backwards compatibility while avoiding duplicate emissions.
 
@@ -309,7 +333,9 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 ### Cross-tab and multi-device coordination
 
 - Share a `storageKeyPrefix` across tabs so extends and expiries propagate instantly.
-- Subscribe to `LeaderElected` events to gate background sync jobs to a single primary tab.
+- Pick a `syncMode` that matches your topology. `'leader'` centralises writes; `'distributed'` lets any tab publish updates with Lamport ordering.
+- Subscribe to `LeaderElected` events in leader mode to gate background sync jobs to a single primary tab.
+- Use the playground distributed diagnostics to rehearse failover and reconciliation flows before release.
 
 ### HTTP and server alignment
 
@@ -328,6 +354,8 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 ## Additional Resources
 
 - **Docs & playground**: `npm run demo:start` (Angular 18 experience app at http://localhost:4200).
+- **Migration guides**: see `docs/migration/distributed-sync.md` for distributed mode adoption steps.
+- **Manual validation**: follow `docs/manual-validation/distributed-playground.md` to rehearse consensus scenarios.
 - **Release notes**: see `RELEASE_NOTES.md` for breaking changes and upgrade hints.
 - **Support & issues**: open tickets at https://github.com/ng2-idle-timeout.
 
@@ -340,3 +368,4 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 - `npm run demo:test` - sanity-check that the demo compiles in development mode.
 
 MIT licensed - happy idling!
+

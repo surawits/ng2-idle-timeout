@@ -1,3 +1,14 @@
+# Sprint 8 Notes
+
+## Highlights
+- Introduced distributed sync mode with Lamport metadata and conflict resolution inside `SessionTimeoutService` and the shared-state coordinator.
+- Documented the new `syncMode` configuration, shared metadata fields, and manual validation workflow.
+- Experience playground docs explain distributed diagnostics and link to the migration guide.
+
+## Testing
+- npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts --runInBand
+- npm run demo:test
+
 # Sprint 6 Release Notes
 
 ## Highlights

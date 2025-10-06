@@ -17,7 +17,7 @@ export class DocsComponent {
 
   readonly craftedByLabel = 'Crafted by Codex';
 
-  readonly heroBadges = ['Signals & streams', 'Cross-tab safe', 'Server aligned'];
+  readonly heroBadges = ['Leader or distributed', 'Cross-tab safe', 'Server aligned'];
 
   readonly sectionNav = [
     { label: 'Overview & Concepts', href: '#overview' },
@@ -29,9 +29,10 @@ export class DocsComponent {
 
   readonly overviewHighlights = [
     'Coordinate idle, countdown, warn, and expire flows with Angular signals plus observable mirrors.',
-    'Synchronise state across tabs with BroadcastChannel, local storage, and leader election.',
-    'Remain zoneless-friendly thanks to DOM, router, and HTTP detectors that operate outside NgZone.'
+    'Synchronise state across tabs with BroadcastChannel, local storage, and Lamport-ordered writers.',
+    'Stay zoneless-friendly while supporting leader and distributed consensus for active-active tabs.'
   ];
+
 
   readonly architectureDiagram = `+--------------+    activity$     +--------------------+
 | Activity DOM | ----------------> |                    |
@@ -149,16 +150,19 @@ export class SessionStatusComponent {
 </section>`;
 
   readonly configOptions = [
-    { key: 'idleGraceMs', defaultValue: '60000', description: 'How long the session may idle before countdown starts.' },
-    { key: 'countdownMs', defaultValue: '300000', description: 'Time window for the user to extend or acknowledge before expiry.' },
-    { key: 'warnBeforeMs', defaultValue: '60000', description: 'Threshold inside the countdown when WARN state triggers.' },
-    { key: 'activityResetCooldownMs', defaultValue: '5000', description: 'Minimum gap between automatic resets triggered by DOM/router noise.' },
-    { key: 'resumeBehavior', defaultValue: 'manual', description: 'Choose manual resume or automatic resume on the next server sync.' },
-    { key: 'storageKeyPrefix', defaultValue: 'session', description: 'Namespacing for persisted configuration and snapshots.' },
-    { key: 'httpActivity.strategy', defaultValue: 'none', description: 'Control how HTTP requests reset idle (`allowlist`, `headerFlag`, or `none`).' },
-    { key: 'actionDelays.start', defaultValue: '0', description: 'Debounce for throttling start/stop/pause/resume actions.' },
-    { key: 'logLevel', defaultValue: 'warn', description: 'Enable debug-level logging when set to `debug`.' }
+    { key: 'syncMode', defaultValue: 'leader', description: 'Coordination mode. Use `leader` to centralise writes or `distributed` for Lamport consensus.' },
+    { key: 'idleGraceMs', defaultValue: '120000', description: 'Milliseconds the session may remain idle before countdown begins.' },
+    { key: 'countdownMs', defaultValue: '3600000', description: 'Countdown window in milliseconds before expiry fires.' },
+    { key: 'warnBeforeMs', defaultValue: '300000', description: 'Warn threshold inside the countdown when prompts should surface.' },
+    { key: 'activityResetCooldownMs', defaultValue: '0', description: 'Minimum gap between automatic idle resets triggered by DOM/router noise.' },
+    { key: 'storageKeyPrefix', defaultValue: 'ng2-idle-timeout', description: 'Namespace used for persisted configuration and snapshots.' },
+    { key: 'resumeBehavior', defaultValue: 'manual', description: 'Keep manual resume or set `autoOnServerSync` when the backend confirms the session.' },
+    { key: 'httpActivity.strategy', defaultValue: 'allowlist', description: 'HTTP auto-reset mode (`allowlist`, `headerFlag`, `aggressive`).' },
+    { key: 'logging', defaultValue: 'warn', description: 'Raise to `debug` or `trace` for verbose diagnostics.' },
+    { key: 'ignoreUserActivityWhenPaused', defaultValue: 'false', description: 'Ignore DOM/router activity while paused to avoid unfreezing inadvertently.' },
+    { key: 'allowManualExtendWhenExpired', defaultValue: 'false', description: 'Permit manual extend calls after expiry when business rules require it.' }
   ];
+
 
   readonly timingDiagram = `Idle            Countdown            Warn              Expired
 |<--60s-->||<-------------300s------------->|<--60s-->|
@@ -193,9 +197,9 @@ export class SessionStatusComponent {
     { signal: 'remainingMsSignal', observable: 'remainingMs$', type: 'number', description: 'Alias of total remaining time for legacy integrations.' },
     { signal: 'isWarnSignal', observable: 'isWarn$', type: 'boolean', description: 'True when the countdown has entered the warn window.' },
     { signal: 'isExpiredSignal', observable: 'isExpired$', type: 'boolean', description: 'True after expiry.' },
-    { signal: '–', observable: 'events$', type: 'Observable<SessionEvent>', description: 'Structured lifecycle events (Started, Warn, Extended, etc.).' },
-    { signal: '–', observable: 'activity$', type: 'Observable<ActivityEvent>', description: 'Activity resets originating from DOM/router/HTTP/manual triggers.' },
-    { signal: '–', observable: 'crossTab$', type: 'Observable<CrossTabMessage>', description: 'Broadcast payloads when cross-tab sync is enabled.' }
+    { signal: 'n/a', observable: 'events$', type: 'Observable<SessionEvent>', description: 'Structured lifecycle events (Started, Warn, Extended, etc.).' },
+    { signal: 'n/a', observable: 'activity$', type: 'Observable<ActivityEvent>', description: 'Activity resets originating from DOM/router/HTTP/manual triggers.' },
+    { signal: 'n/a', observable: 'crossTab$', type: 'Observable<CrossTabMessage>', description: 'Broadcast payloads when cross-tab sync is enabled.' }
   ];
 
   readonly tokenRows = [
@@ -224,8 +228,10 @@ export class SessionStatusComponent {
 
   readonly crossTabTips = [
     'Share a `storageKeyPrefix` across tabs so extends and expiries propagate instantly.',
-    'Observe `LeaderElected` events to gate background sync jobs to a single primary tab.'
+    'Set `syncMode: "distributed"` when every tab must publish updates; Lamport clocks deterministically pick the winning snapshot.',
+    'Observe `LeaderElected` events in leader mode or monitor metadata revisions in distributed mode to decide where background jobs run.'
   ];
+
 
   readonly httpTips = [
     'Register `SessionActivityHttpInterceptor` and configure `httpActivity` allowlists for safe resets.',

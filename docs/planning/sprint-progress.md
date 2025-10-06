@@ -17,7 +17,7 @@
 - cp4b-distributed-service: Done
 - cp4c-distributed-tests: Done
 - cp5-playground: Done
-- cp6-docs: Next
+- cp6-docs: Done
 
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
@@ -46,3 +46,9 @@
 - 2025-10-06 20:15 - Kicked off CP5 playground updates: added sync mode selector, diagnostics panel, shared-state controls, and drafted distributed manual validation checklist.
 
 - 2025-10-06 20:55 - Completed CP5 playground checkpoint: shipped sync-mode selector, diagnostics card, manual validation guide, and passed `npm run demo:test` build.
+
+- 2025-10-06 21:10 - Started CP6 documentation/migration checkpoint; reviewing README, docs.component, release notes for distributed-mode updates.
+- 2025-10-06 21:32 - Updated README, experience docs, and created docs/migration/distributed-sync.md to document distributed sync behaviour for CP6.
+- 2025-10-06 21:40 - Ran npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts --runInBand and npm run demo:test for CP6 verification.
+
+- 2025-10-06 21:45 - Marked CP6 documentation/migration/verification checkpoint complete; release notes and planning records synced.

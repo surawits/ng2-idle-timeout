@@ -148,6 +148,23 @@
           <p>{{ preset.description }}</p>
         </div>
       </div>
+      <h3 class="section-heading">Sync modes</h3>
+      <p>Pick the coordination strategy that matches your application topology.</p>
+      <ul class="list-bullet">
+        <li><code>leader</code> keeps a single writer that persists snapshots and rebroadcasts updates.</li>
+        <li><code>distributed</code> enables active-active writers with Lamport clocks so simultaneous updates reconcile deterministically.</li>
+      </ul>
+      <p class="helper">Align <code>syncMode</code> across tabs before starting the service. Mismatched modes trigger reconciliation loops and warning banners in the playground.</p>
+
+      <h3 class="section-heading">Shared state metadata</h3>
+      <p>Distributed mode snapshots include metadata so peers can reason about ordering:</p>
+      <ul class="list-bullet">
+        <li><code>revision</code> and <code>logicalClock</code> track monotonic progress for each snapshot.</li>
+        <li><code>writerId</code> identifies which tab created the update.</li>
+        <li><code>operation</code> distinguishes activity resets, extends, pauses, resumes, config changes, and expiries.</li>
+        <li><code>causalityToken</code> lets retries and expect-reply flows collapse duplicate broadcasts.</li>
+      </ul>
+      <p class="helper">Schema version 3 automatically upgrades older persisted payloads, but clearing storage during rollout avoids stale Lamport clocks.</p>
     </div>
   </article>
 
