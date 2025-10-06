@@ -8,7 +8,8 @@ import { SharedStateCoordinatorService } from './shared-state-coordinator.servic
 import {
   SHARED_STATE_VERSION,
   type SharedSessionState,
-  type SharedStateMessage
+  type SharedStateMessage,
+  type SharedStateRequestMessage
 } from '../models/session-shared-state';
 import { TimeSourceService } from './time-source.service';
 
@@ -216,6 +217,65 @@ describe('SharedStateCoordinatorService', () => {
     const message = channel?.messages.at(-1) as { type: string; reason?: string } | undefined;
     expect(message?.type).toBe('request-sync');
     expect(message?.reason).toBe('join');
+  });
+
+  it('requests sync with expectReply flag', () => {
+    const adapter = broadcastMock.__getChannel('testApp:shared-test:shared-state') as ({ messages: unknown[] } | undefined);
+    expect(adapter).toBeDefined();
+    if (adapter) {
+      adapter.messages.length = 0;
+    }
+    service.requestSync('bootstrap', true);
+    const message = adapter?.messages.at(-1) as SharedStateRequestMessage | undefined;
+    expect(message?.type).toBe('request-sync');
+    expect(message?.reason).toBe('bootstrap');
+    expect(message?.expectReply).toBe(true);
+  });
+
+  it('coerces legacy shared state payloads to metadata v3 schema', () => {
+    const legacy = {
+      version: 2,
+      updatedAt: 4200,
+      syncMode: 'distributed',
+      leader: null,
+      snapshot: {
+        state: 'COUNTDOWN',
+        remainingMs: 800,
+        idleStartAt: 1000,
+        countdownEndAt: 1800,
+        lastActivityAt: 1000,
+        paused: false
+      },
+      config: {
+        idleGraceMs: baseConfig.idleGraceMs,
+        countdownMs: baseConfig.countdownMs,
+        warnBeforeMs: baseConfig.warnBeforeMs,
+        activityResetCooldownMs: baseConfig.activityResetCooldownMs,
+        storageKeyPrefix: baseConfig.storageKeyPrefix,
+        syncMode: 'distributed',
+        resumeBehavior: baseConfig.resumeBehavior,
+        ignoreUserActivityWhenPaused: baseConfig.ignoreUserActivityWhenPaused,
+        allowManualExtendWhenExpired: baseConfig.allowManualExtendWhenExpired
+      }
+    } as const;
+
+    localStorage.setItem('shared-test:shared-state', JSON.stringify(legacy));
+
+    const normalized = service.readPersistedState();
+    expect(normalized).not.toBeNull();
+    if (!normalized) {
+      return;
+    }
+
+    expect(normalized.version).toBe(SHARED_STATE_VERSION);
+    expect(normalized.syncMode).toBe('distributed');
+    expect(normalized.metadata.operation).toBe('bootstrap');
+    expect(normalized.metadata.revision).toBe(1);
+    expect(normalized.metadata.writerId).toBe(service.getSourceId());
+    expect(normalized.metadata.logicalClock).toBe(legacy.updatedAt);
+    expect(normalized.metadata.causalityToken).toBe(`${normalized.metadata.writerId}:${normalized.metadata.logicalClock}`);
+    expect(normalized.config.revision).toBe(1);
+    expect(normalized.config.writerId).toBe(service.getSourceId());
   });
 
   it('ignores messages originating from the same source', () => {

@@ -66,7 +66,7 @@ items:
 - id: cp4c-distributed-tests
   title: 4c Distributed-mode test coverage
   owner: codex
-  status: Next
+  status: Done
   notes: concurrent activity scenarios, sleep/wake simulations
   dependencies:
   - cp4b-distributed-service

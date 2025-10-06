@@ -16,7 +16,7 @@
 ## Checkpoints
 - [x] Checkpoint 1 – Discovery & Design Notes
   - Deliverables: architectural brief, behaviour matrix for syncMode, risk log, verification outline (`docs/planning/cross-tab-sync-discovery.md`).
-- [ ] Checkpoint 2 – Shared State Foundations
+- [x] Checkpoint 2 – Shared State Foundations
   - Sub-checkpoints:
     - [x] 2a Config & Validation updates for syncMode and schema adjustments (`packages/ng2-idle-timeout/src/lib/validation.ts`).
     - [x] 2b Shared-state coordinator (storage + broadcast) with unit tests (`packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.ts`).
@@ -26,11 +26,11 @@
     - [x] 3a Service integration with coordinator for leader ownership flow.
     - [x] 3b Leader lifecycle & failover handling enhancements.
     - [x] 3c Leader-mode regression test suite rewrite.
-- [ ] Checkpoint 4 – Distributed Mode Implementation
+- [x] Checkpoint 4 – Distributed Mode Implementation
   - Sub-checkpoints:
     - [x] 4a Consensus rules and conflict-resolution algorithm (Done).
     - [x] 4b Service wiring for distributed reconciliation and activity propagation (Done).
-    - [ ] 4c Distributed-mode test coverage.
+    - [x] 4c Distributed-mode test coverage.
 - [ ] Checkpoint 5 – Playground & Integration Updates
   - Deliverables: multi-tab demo controls, manual validation script, optional smoke tests.
 - [ ] Checkpoint 6 – Documentation, Migration, Verification

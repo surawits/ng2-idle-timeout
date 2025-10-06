@@ -15,7 +15,7 @@
 - cp3c-leader-tests: Done
 - cp4a-distributed-rules: Done
 - cp4b-distributed-service: Done
-- cp4c-distributed-tests: Next
+- cp4c-distributed-tests: Done
 - cp5-playground: Next
 - cp6-docs: Next
 
@@ -38,3 +38,7 @@
 - 2025-10-06 13:05 - Completed CP4b.1 models/coordinator Lamport wiring; began SessionTimeoutService distributed arbitration (tests: shared-state-coordinator, session-timeout/service/cross-tab specs).
 
 - 2025-10-06 18:05 - Completed CP4b distributed service wiring: tightened snapshot operations, throttled auto-extend broadcasts, refined config-change handling; verified with npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand.
+- 2025-10-06 18:45 - Expanded CP4c coverage for distributed arbitration and coordinator normalization; verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand`.
+- 2025-10-06 19:20 - Completed distributed race/pause coverage and added persisted wake restoration spec; verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand`.
+- 2025-10-06 19:28 - Finalized CP4c distributed coverage (service expire/pause races, persisted wake), verified via focused service/coordinator/cross-tab suites.
+- 2025-10-06 19:30 - Checkpoint 4 – Distributed Mode Implementation marked complete.
