@@ -31,8 +31,8 @@ items:
 - id: cp3a-leader-integration
   title: 3a Service integration for leader ownership flow
   owner: codex
-  status: Next
-  notes: SessionTimeoutService wiring to coordinator
+  status: Done
+  notes: SessionTimeoutService wiring to coordinator; validate with packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts
   dependencies:
   - cp2c-messaging
 - id: cp3b-leader-lifecycle

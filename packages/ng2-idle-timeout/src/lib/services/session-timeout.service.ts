@@ -147,7 +147,14 @@ export class SessionTimeoutService {
     this.domActivity?.updateConfig(config);
     this.routerActivity?.updateConfig(config);
     this.serverTime?.configure(config);
-    this.leaderElection?.updateConfig(config);
+    if (this.leaderElection) {
+      this.leaderElection.updateConfig(config);
+      if (config.syncMode === 'leader') {
+        this.leaderElection.electLeader();
+      } else {
+        this.leaderElection.stepDown();
+      }
+    }
     this.sharedStateCoordinator.updateConfig(config);
     this.syncLeaderState();
     this.setupCrossTabChannel(config);
@@ -957,15 +964,34 @@ export class SessionTimeoutService {
     if (!this.leaderElection) {
       return;
     }
+    const config = this.configSignal();
     const isLeader = this.leaderElection.isLeader();
     const leaderId = this.leaderElection.leaderId();
-    if (this.leaderState === null) {
-      this.leaderState = isLeader;
+    const previous = this.leaderState;
+    this.leaderState = isLeader;
+
+    if (previous === null) {
+      if (isLeader && config.syncMode === 'leader') {
+        this.broadcastSharedState();
+      }
       return;
     }
-    if (this.leaderState !== isLeader) {
-      this.leaderState = isLeader;
-      this.emitEvent(isLeader ? 'LeaderElected' : 'LeaderLost', { leaderId });
+
+    if (previous === isLeader) {
+      return;
+    }
+
+    if (isLeader) {
+      this.emitEvent('LeaderElected', { leaderId });
+      if (config.syncMode === 'leader') {
+        this.broadcastSharedState();
+      }
+    } else {
+      this.emitEvent('LeaderLost', { leaderId });
+      if (config.syncMode === 'leader') {
+        this.sharedStateCoordinator.requestSync('leader-changed');
+        this.broadcastCrossTab('sync-request');
+      }
     }
   }
 

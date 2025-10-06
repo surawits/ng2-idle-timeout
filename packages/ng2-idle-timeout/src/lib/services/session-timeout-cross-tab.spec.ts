@@ -1,15 +1,35 @@
 import { TestBed } from '@angular/core/testing';
+import { Subject } from 'rxjs';
 import type { SessionSnapshot } from '../models/session-state';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import type { CrossTabMessage } from '../models/cross-tab-message';
-import { SHARED_STATE_VERSION, type SharedSessionState } from '../models/session-shared-state';
+import {
+  SHARED_STATE_VERSION,
+  type SharedSessionState,
+  type SharedStateMessage
+} from '../models/session-shared-state';
 import type { BroadcastAdapter } from '../utils/broadcast-channel';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
 import { LeaderElectionService } from './leader-election.service';
+import { SharedStateCoordinatorService } from './shared-state-coordinator.service';
 import { TimeSourceService } from './time-source.service';
 import { ServerTimeService } from './server-time.service';
+
+class SharedStateCoordinatorStub {
+  updateConfig = jest.fn();
+  publishState = jest.fn();
+  requestSync = jest.fn();
+  readPersistedState = jest.fn<SharedSessionState | null, []>(() => null);
+  clearPersistedState = jest.fn();
+  private readonly updatesSubject = new Subject<SharedStateMessage>();
+  readonly updates$ = this.updatesSubject.asObservable();
+
+  emit(message: SharedStateMessage): void {
+    this.updatesSubject.next(message);
+  }
+}
 
 jest.mock('../utils/broadcast-channel', () => {
   class MockBroadcastAdapter implements BroadcastAdapter {
@@ -77,6 +97,9 @@ describe('SessionTimeoutService cross-tab sync', () => {
   let service: SessionTimeoutService;
   let time: MockTimeSourceService;
   let broadcastMock: BroadcastMockModule;
+  let sharedCoordinator: SharedStateCoordinatorStub;
+  let requestSyncMock: jest.Mock;
+  let publishStateMock: jest.Mock;
   const baseConfig: SessionTimeoutConfig = {
     idleGraceMs: 200,
     countdownMs: 1000,
@@ -130,21 +153,34 @@ describe('SessionTimeoutService cross-tab sync', () => {
     TestBed.configureTestingModule({
       providers: [
         SessionTimeoutService,
+        { provide: SharedStateCoordinatorService, useClass: SharedStateCoordinatorStub },
         { provide: TimeSourceService, useClass: MockTimeSourceService },
         { provide: SESSION_TIMEOUT_CONFIG, useValue: baseConfig },
         { provide: ServerTimeService, useValue: { configure: jest.fn(), stop: jest.fn() } }
       ]
     });
 
+    sharedCoordinator = TestBed.inject(
+      SharedStateCoordinatorService
+    ) as unknown as SharedStateCoordinatorStub;
+    requestSyncMock = sharedCoordinator.requestSync;
+    publishStateMock = sharedCoordinator.publishState;
     service = TestBed.inject(SessionTimeoutService);
     time = TestBed.inject(TimeSourceService) as unknown as MockTimeSourceService;
   });
 
   afterEach(() => {
+    requestSyncMock?.mockReset();
+    publishStateMock?.mockReset();
     localStorage.clear();
     TestBed.resetTestingModule();
     broadcastMock.__resetChannels();
   });
+  async function flushAsync(iterations = 3): Promise<void> {
+    for (let index = 0; index < iterations; index += 1) {
+      await Promise.resolve();
+    }
+  }
 
   function manualTick(): void {
     (service as unknown as { handleTick: () => void }).handleTick();
@@ -264,7 +300,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(expireEvents.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('applies shared session state when sync message includes sharedState payload', () => {
+  it('applies shared session state when sync message includes sharedState payload', done => {
     service.start();
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
@@ -311,6 +347,9 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(currentSnapshot.state).toBe('COUNTDOWN');
     expect(currentSnapshot.remainingMs).toBe(900);
     expect(currentSnapshot.countdownEndAt).toBe(sharedState.snapshot.countdownEndAt);
+    // Reset the module here to tear down leader-election timers before Jest waits for idle handles.
+    TestBed.resetTestingModule();
+    done();
   });
   it('emits leader election events on leadership changes', async () => {
     const captured: Array<{ type: string; meta?: Record<string, unknown> }> = [];
@@ -410,11 +449,59 @@ describe('SessionTimeoutService cross-tab sync', () => {
       at: time.now()
     } satisfies CrossTabMessage);
 
-    await Promise.resolve();
+    await flushAsync();
 
     const syncMessage = messages.find(message => message.type === 'sync');
     expect(syncMessage).toBeDefined();
     expect(syncMessage?.payload?.sharedState?.version).toBe(SHARED_STATE_VERSION);
     expect(syncMessage?.payload?.sharedState?.config.syncMode).toBe('leader');
+  });
+
+  it('requests shared-state sync from coordinator when leadership is lost', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+
+    await flushAsync();
+    requestSyncMock.mockClear();
+
+    leader.stepDown();
+
+    await flushAsync();
+
+    expect(requestSyncMock).toHaveBeenCalledWith('leader-changed');
+  });
+
+  it('publishes shared state bundle when leadership is acquired', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+
+    await flushAsync();
+    const initialCalls = publishStateMock.mock.calls.length;
+
+    leader.stepDown();
+
+    await flushAsync();
+
+    leader.electLeader();
+
+    await flushAsync();
+
+    expect(publishStateMock.mock.calls.length).toBeGreaterThan(initialCalls);
+  });
+
+  it('emits sync-request message on leader loss to prompt followers', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    const captured: CrossTabMessage[] = [];
+    const sub = service.crossTab$.subscribe(message => captured.push(message));
+
+    await flushAsync();
+    captured.length = 0;
+
+    leader.stepDown();
+
+    await flushAsync();
+
+    const syncRequestExists = captured.some(message => message.type === 'sync-request');
+    expect(syncRequestExists).toBe(true);
+
+    sub.unsubscribe();
   });
 });

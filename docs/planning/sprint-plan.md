@@ -23,7 +23,7 @@
     - [x] 2c Cross-tab messaging contract revisions and baseline tests (`packages/ng2-idle-timeout/src/lib/models/cross-tab-message.ts`).
 - [ ] Checkpoint 3 – Leader Mode Rework
   - Sub-checkpoints:
-    - [ ] 3a Service integration with coordinator for leader ownership flow.
+    - [x] 3a Service integration with coordinator for leader ownership flow.
     - [ ] 3b Leader lifecycle & failover handling enhancements.
     - [ ] 3c Leader-mode regression test suite rewrite.
 - [ ] Checkpoint 4 – Distributed Mode Implementation
