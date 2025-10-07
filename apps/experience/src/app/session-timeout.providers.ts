@@ -1,7 +1,7 @@
-import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+import { createSessionTimeoutProviders } from 'ng2-idle-timeout';
 import type { SessionSyncMode, SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
 
-const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
+export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
   storageKeyPrefix: 'demo-experience',
   idleGraceMs: 5000,
   countdownMs: 15000,
@@ -55,12 +55,6 @@ function buildSessionTimeoutConfig(): SessionTimeoutPartialConfig {
   };
 }
 
-export const experienceSessionTimeoutProviders = [
-  SessionTimeoutService,
-  {
-    provide: SESSION_TIMEOUT_CONFIG,
-    useFactory: buildSessionTimeoutConfig
-  }
-];
+export const experienceSessionTimeoutProviders = createSessionTimeoutProviders(buildSessionTimeoutConfig);
 
 

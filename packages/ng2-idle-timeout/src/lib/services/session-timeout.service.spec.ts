@@ -6,7 +6,7 @@ import type { Observable } from 'rxjs';
 
 import type { ActivityEvent } from '../models/activity-event';
 import type { SessionSnapshot } from '../models/session-state';
-import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import type { SessionTimeoutConfig, SessionTimeoutPartialConfig } from '../models/session-timeout-config';
 import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
 import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 import { SessionTimeoutService } from './session-timeout.service';
@@ -19,6 +19,7 @@ import { TimeSourceService } from './time-source.service';
 import { ActivityDomService } from './activity-dom.service';
 import { ActivityRouterService } from './activity-router.service';
 import { ServerTimeService } from './server-time.service';
+import { createSessionTimeoutProviders } from '../provide-session-timeout';
 
 
 jest.mock('../utils/broadcast-channel', () => {
@@ -1250,6 +1251,57 @@ describe('SessionTimeoutService', () => {
     expect(leaderStates.pop()?.leader?.epoch).toBe(5);
   });
 
+});
+
+describe('SessionTimeoutService provider bootstrap', () => {
+  let broadcastMock: BroadcastMockModule;
+
+  beforeEach(() => {
+    broadcastMock = jest.requireMock('../utils/broadcast-channel') as BroadcastMockModule;
+    broadcastMock.__resetChannels();
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    broadcastMock.__resetChannels();
+    TestBed.resetTestingModule();
+    localStorage.clear();
+  });
+
+  it('applies partial config from providers without calling setConfig()', () => {
+    const partial: SessionTimeoutPartialConfig = {
+      storageKeyPrefix: 'app-session',
+      idleGraceMs: 60_000,
+      countdownMs: 300_000,
+      warnBeforeMs: 60_000,
+      resumeBehavior: 'autoOnServerSync'
+    };
+
+    const domService = new StubActivityDomService();
+    const routerService = new StubActivityRouterService();
+    const serverTime = new StubServerTimeService();
+
+    TestBed.configureTestingModule({
+      providers: [
+        ...createSessionTimeoutProviders(partial),
+        { provide: TimeSourceService, useClass: MockTimeSourceService },
+        { provide: SharedStateCoordinatorService, useClass: SharedStateCoordinatorStub },
+        { provide: ActivityDomService, useValue: domService },
+        { provide: ActivityRouterService, useValue: routerService },
+        { provide: ServerTimeService, useValue: serverTime },
+        { provide: LeaderElectionService, useClass: StubLeaderElectionService }
+      ]
+    });
+
+    const configuredService = TestBed.inject(SessionTimeoutService);
+    const config = configuredService.getConfig();
+
+    expect(config.storageKeyPrefix).toBe('app-session');
+    expect(config.idleGraceMs).toBe(60_000);
+    expect(config.countdownMs).toBe(300_000);
+    expect(config.warnBeforeMs).toBe(60_000);
+    expect(config.resumeBehavior).toBe('autoOnServerSync');
+  });
 });
 
 

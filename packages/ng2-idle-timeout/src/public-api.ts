@@ -21,6 +21,7 @@ export * from './lib/utils/format-ms.pipe';
 export * from './lib/defaults';
 export * from './lib/validation';
 export * from './lib/services/server-time.service';
+export * from './lib/provide-session-timeout';
 
 export * from './lib/interceptors/session-activity-http.context';
 

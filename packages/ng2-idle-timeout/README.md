@@ -71,23 +71,22 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
 
 2. **Define shared providers**
 
+   Use `createSessionTimeoutProviders` to bundle the service and configuration once and reuse the exported config with `provideSessionTimeout` when bootstrapping.
+
    ```ts
    // session-timeout.providers.ts
-   import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+   import { createSessionTimeoutProviders } from 'ng2-idle-timeout';
+   import type { SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
 
-   export const sessionTimeoutProviders = [
-     SessionTimeoutService,
-     {
-       provide: SESSION_TIMEOUT_CONFIG,
-       useValue: {
-         storageKeyPrefix: 'app-session',
-         idleGraceMs: 60_000,
-         countdownMs: 300_000,
-         warnBeforeMs: 60_000,
-         resumeBehavior: 'autoOnServerSync'
-       }
-     }
-   ];
+   export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
+     storageKeyPrefix: 'app-session',
+     idleGraceMs: 60_000,
+     countdownMs: 300_000,
+     warnBeforeMs: 60_000,
+     resumeBehavior: 'autoOnServerSync'
+   };
+
+   export const sessionTimeoutProviders = createSessionTimeoutProviders(defaultSessionTimeoutConfig);
    ```
 
 > Switch to distributed coordination by setting `syncMode: 'distributed'` in the config. All tabs must opt in to keep consensus stable.
@@ -101,12 +100,18 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
    import { provideRouter } from '@angular/router';
    import { AppComponent } from './app/app.component';
    import { routes } from './app/app.routes';
-   import { sessionTimeoutProviders } from './app/session-timeout.providers';
+   import { provideSessionTimeout } from 'ng2-idle-timeout';
 
    bootstrapApplication(AppComponent, {
      providers: [
        provideRouter(routes),
-       ...sessionTimeoutProviders
+       provideSessionTimeout(() => ({
+         storageKeyPrefix: 'app-session',
+         idleGraceMs: 60_000,
+         countdownMs: 300_000,
+         warnBeforeMs: 60_000,
+         resumeBehavior: 'autoOnServerSync'
+       }))
      ]
    });
    ```

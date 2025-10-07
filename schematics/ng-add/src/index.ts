@@ -51,22 +51,16 @@ function ensureProvidersFile(tree: Tree, context: SchematicContext): void {
     return;
   }
 
-  const content = `import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+  const content = `import { createSessionTimeoutProviders } from 'ng2-idle-timeout';
 import type { SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
 
-const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
+export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
   storageKeyPrefix: 'app-session',
   resumeBehavior: 'autoOnServerSync',
   warnBeforeMs: 60000
 };
 
-export const sessionTimeoutProviders = [
-  SessionTimeoutService,
-  {
-    provide: SESSION_TIMEOUT_CONFIG,
-    useValue: defaultSessionTimeoutConfig
-  }
-];
+export const sessionTimeoutProviders = createSessionTimeoutProviders(defaultSessionTimeoutConfig);
 `;
 
   tree.create(PROVIDERS_PATH, content);

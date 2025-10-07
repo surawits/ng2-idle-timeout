@@ -42,7 +42,7 @@ describe('ng-add schematic', () => {
 
     const providersContent = result.readContent('src/app/session-timeout.providers.ts');
     expect(providersContent).toContain('sessionTimeoutProviders');
-    expect(providersContent).toContain('SessionTimeoutService');
+    expect(providersContent).toContain('createSessionTimeoutProviders');
   });
 
   it('wires sessionTimeoutProviders into app.config.ts', async () => {

@@ -17,7 +17,7 @@ const MAX_RETRY_DELAY_MS = 60_000;
 
 @Injectable({ providedIn: 'root' })
 export class ServerTimeService {
-  private readonly http = inject(HttpClient);
+  private readonly http = inject(HttpClient, { optional: true });
   private readonly timeSource = inject(TimeSourceService);
   private readonly zone = inject(NgZone);
   private readonly syncListeners = new Set<() => void>();
@@ -27,6 +27,7 @@ export class ServerTimeService {
   private retryAttempts = 0;
   private timerHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
   private inFlight: Subscription | null = null;
+  private missingHttpClientWarned = false;
 
   configure(config: SessionTimeoutConfig): void {
     this.currentConfig = config;
@@ -37,6 +38,12 @@ export class ServerTimeService {
 
     if (this.endpoint !== config.serverTimeEndpoint) {
       this.endpoint = config.serverTimeEndpoint;
+    }
+
+    if (!this.http) {
+      this.warnMissingHttpClient();
+      this.stop(true);
+      return;
     }
 
     this.retryAttempts = 0;
@@ -59,6 +66,10 @@ export class ServerTimeService {
     if (!this.endpoint || this.inFlight) {
       return;
     }
+    if (!this.http) {
+      this.warnMissingHttpClient();
+      return;
+    }
     if (resetBackoff) {
       this.retryAttempts = 0;
     }
@@ -68,6 +79,10 @@ export class ServerTimeService {
   private fetchServerOffset(): void {
     const endpoint = this.endpoint;
     if (!endpoint) {
+      return;
+    }
+    if (!this.http) {
+      this.warnMissingHttpClient();
       return;
     }
 
@@ -188,5 +203,15 @@ export class ServerTimeService {
     }
     this.timerHandle = null;
   }
-}
 
+  private warnMissingHttpClient(): void {
+    if (this.missingHttpClientWarned) {
+      return;
+    }
+    console.warn(
+      '[ng2-idle-timeout] HttpClient is not available. Server time synchronisation is disabled. ' +
+        'Provide HttpClient (e.g. provideHttpClient or HttpClientModule) to enable timeSource: "server".'
+    );
+    this.missingHttpClientWarned = true;
+  }
+}

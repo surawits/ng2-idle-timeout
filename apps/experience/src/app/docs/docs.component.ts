@@ -52,33 +52,36 @@ export class DocsComponent {
   ];
 
   readonly providerSnippet = `// session-timeout.providers.ts
-import { SESSION_TIMEOUT_CONFIG, SessionTimeoutService } from 'ng2-idle-timeout';
+import { createSessionTimeoutProviders } from 'ng2-idle-timeout';
+import type { SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
 
-export const sessionTimeoutProviders = [
-  SessionTimeoutService,
-  {
-    provide: SESSION_TIMEOUT_CONFIG,
-    useValue: {
-      storageKeyPrefix: 'app-session',
-      idleGraceMs: 60_000,
-      countdownMs: 300_000,
-      warnBeforeMs: 60_000,
-      resumeBehavior: 'autoOnServerSync'
-    }
-  }
-];`;
+export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
+  storageKeyPrefix: 'app-session',
+  idleGraceMs: 60_000,
+  countdownMs: 300_000,
+  warnBeforeMs: 60_000,
+  resumeBehavior: 'autoOnServerSync'
+};
+
+export const sessionTimeoutProviders = createSessionTimeoutProviders(defaultSessionTimeoutConfig);`;
 
   readonly standaloneBootstrapSnippet = `// main.ts
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { AppComponent } from './app/app.component';
 import { routes } from './app/app.routes';
-import { sessionTimeoutProviders } from './app/session-timeout.providers';
+import { provideSessionTimeout } from 'ng2-idle-timeout';
 
 bootstrapApplication(AppComponent, {
   providers: [
     provideRouter(routes),
-    ...sessionTimeoutProviders
+    provideSessionTimeout(() => ({
+      storageKeyPrefix: 'app-session',
+      idleGraceMs: 60_000,
+      countdownMs: 300_000,
+      warnBeforeMs: 60_000,
+      resumeBehavior: 'autoOnServerSync'
+    }))
   ]
 });`;
 

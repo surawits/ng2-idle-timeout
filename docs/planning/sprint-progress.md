@@ -1,7 +1,7 @@
 # Sprint Progress
 
 ## Summary
-- Date: 2025-10-07
+- Date: 2025-10-08
 - Overall status: In Progress
 - Blockers: None
 
@@ -55,3 +55,5 @@
 - 2025-10-07 15:20 - Restored observer config mirroring after auto-start changes; revalidated with `npm run demo:test`.
 - 2025-10-07 15:45 - Prepared v0.3.0 package (version bump, README asset); build/test succeeded, lint pending fixes.
 - 2025-10-07 15:55 - Cleared lint debt for publishing, reran unit tests/build, and packed `ng2-idle-timeout@0.3.0` with README.
+- 2025-10-08 09:20 - Kicked off CP7 provider reliability hotfix after reports that `sessionTimeoutProviders` bootstraps failed without HttpClient; capturing diagnostics and mitigation plan.
+- 2025-10-08 12:15 - Completed CP7 fix: made `ServerTimeService` tolerate missing HttpClient, introduced `createSessionTimeoutProviders`/`provideSessionTimeout`, refreshed docs & schematics, and verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/server-time.service.spec.ts` plus `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/session-timeout.service.spec.ts`.
