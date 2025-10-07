@@ -35,6 +35,9 @@ interface MetadataItem {
   hint?: string;
 }
 
+const AUTO_START_DELAY_MS = 150;
+const STALE_SHARED_STATE_THRESHOLD_MS = 5000;
+
 @Component({
   selector: 'experience-playground',
   standalone: true,
@@ -89,6 +92,8 @@ export class PlaygroundComponent {
 
   private readonly sharedStateInternal = signal<SharedSessionState | null>(null);
   readonly sharedState = this.sharedStateInternal.asReadonly();
+  private autoStartHandle: ReturnType<typeof setTimeout> | null = null;
+  private autoStartSuppressed = false;
 
   readonly sharedStateUpdatedAt = computed(() => {
     const state = this.sharedState();
@@ -159,6 +164,10 @@ export class PlaygroundComponent {
   readonly snapshot = computed(() => this.sessionTimeout.getSnapshot());
   readonly sessionState = computed(() => this.snapshot().state);
   readonly isSessionActive = computed(() => {
+    const localSnapshot = this.snapshot();
+    if (localSnapshot.idleStartAt != null) {
+      return true;
+    }
     if (this.serviceActive()) {
       return true;
     }
@@ -245,14 +254,14 @@ export class PlaygroundComponent {
 
     const persistedState = this.sharedStateCoordinator.readPersistedState();
     if (persistedState) {
-      this.sharedStateInternal.set(persistedState);
-      this.serviceActive.set(persistedState.snapshot.idleStartAt != null);
+      this.handleSharedStateSnapshot(persistedState);
+    } else {
+      this.scheduleAutoStart();
     }
 
     const sharedStateSub = this.sharedStateCoordinator.updates$.subscribe(message => {
       if (message.type === 'state') {
-        this.sharedStateInternal.set(message.state);
-        this.serviceActive.set(message.state.snapshot.idleStartAt != null);
+        this.handleSharedStateSnapshot(message.state);
       }
     });
 
@@ -292,6 +301,7 @@ export class PlaygroundComponent {
       eventsSub.unsubscribe();
       activitySub.unsubscribe();
       sharedStateSub.unsubscribe();
+      this.clearAutoStartTimer();
     });
   }
 
@@ -311,6 +321,8 @@ export class PlaygroundComponent {
     });
     const nextConfig = this.sessionTimeout.getConfig();
     this.syncLocalConfigInputs(nextConfig);
+    this.autoStartSuppressed = false;
+    this.scheduleAutoStart();
     if (!this.serviceActive()) {
       this.sessionTimeout.stop();
     }
@@ -409,6 +421,81 @@ export class PlaygroundComponent {
     return this.domEventOptions.filter(option => this.domEventSelection.has(option));
   }
 
+  private handleSharedStateSnapshot(state: SharedSessionState): void {
+    this.sharedStateInternal.set(state);
+    if (this.isObserverMode) {
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(() => this.syncLocalConfigInputs(this.sessionTimeout.getConfig()));
+      } else {
+        setTimeout(() => this.syncLocalConfigInputs(this.sessionTimeout.getConfig()), 0);
+      }
+      return;
+    }
+    const localSnapshot = this.snapshot();
+    if (localSnapshot.idleStartAt != null) {
+      return;
+    }
+    const remoteActive =
+      state.snapshot.idleStartAt != null &&
+      state.metadata.writerId !== this.coordinatorSourceId &&
+      Date.now() - state.updatedAt < STALE_SHARED_STATE_THRESHOLD_MS;
+    if (remoteActive) {
+      this.clearAutoStartTimer();
+      return;
+    }
+    this.scheduleAutoStart();
+  }
+
+  private scheduleAutoStart(): void {
+    if (this.isObserverMode) {
+      return;
+    }
+    if (this.autoStartSuppressed) {
+      return;
+    }
+    const localSnapshot = this.snapshot();
+    if (localSnapshot.idleStartAt != null) {
+      return;
+    }
+    const shared = this.sharedState();
+    if (
+      shared &&
+      shared.snapshot.idleStartAt != null &&
+      shared.metadata.writerId !== this.coordinatorSourceId &&
+      Date.now() - shared.updatedAt < STALE_SHARED_STATE_THRESHOLD_MS
+    ) {
+      return;
+    }
+    this.clearAutoStartTimer();
+    this.autoStartHandle = setTimeout(() => {
+      this.autoStartHandle = null;
+      const latestSnapshot = this.snapshot();
+      if (latestSnapshot.idleStartAt != null) {
+        return;
+      }
+      if (this.autoStartSuppressed) {
+        return;
+      }
+      const latestShared = this.sharedState();
+      if (
+        latestShared &&
+        latestShared.snapshot.idleStartAt != null &&
+        latestShared.metadata.writerId !== this.coordinatorSourceId &&
+        Date.now() - latestShared.updatedAt < STALE_SHARED_STATE_THRESHOLD_MS
+      ) {
+        return;
+      }
+      this.start();
+    }, AUTO_START_DELAY_MS);
+  }
+
+  private clearAutoStartTimer(): void {
+    if (this.autoStartHandle != null) {
+      clearTimeout(this.autoStartHandle);
+      this.autoStartHandle = null;
+    }
+  }
+
   start(): void {
     if (this.isObserverMode) {
       return;
@@ -416,6 +503,8 @@ export class PlaygroundComponent {
     if (this.serviceActive()) {
       return;
     }
+    this.autoStartSuppressed = false;
+    this.clearAutoStartTimer();
     this.serviceActive.set(true);
     this.events = [];
     this.activityLog = [];
@@ -432,6 +521,8 @@ export class PlaygroundComponent {
       return;
     }
     this.serviceActive.set(false);
+    this.autoStartSuppressed = true;
+    this.clearAutoStartTimer();
     this.sessionTimeout.stop();
   }
 
