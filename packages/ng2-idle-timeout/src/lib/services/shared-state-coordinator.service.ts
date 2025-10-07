@@ -9,7 +9,6 @@ import {
   type SharedSessionState,
   type SharedStateMessage,
   type SharedStateBroadcastMessage,
-  type SharedStateRequestMessage,
   type SharedStateMetadata,
   type SharedStateOperation,
   type SharedConfigPayload

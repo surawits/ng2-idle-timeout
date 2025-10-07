@@ -52,3 +52,6 @@
 - 2025-10-06 21:40 - Ran npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts --runInBand and npm run demo:test for CP6 verification.
 
 - 2025-10-06 21:45 - Marked CP6 documentation/migration/verification checkpoint complete; release notes and planning records synced.
+- 2025-10-07 15:20 - Restored observer config mirroring after auto-start changes; revalidated with `npm run demo:test`.
+- 2025-10-07 15:45 - Prepared v0.3.0 package (version bump, README asset); build/test succeeded, lint pending fixes.
+- 2025-10-07 15:55 - Cleared lint debt for publishing, reran unit tests/build, and packed `ng2-idle-timeout@0.3.0` with README.

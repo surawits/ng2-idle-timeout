@@ -1,6 +1,7 @@
 ﻿import { HttpClient } from '@angular/common/http';
 import { Injectable, NgZone, inject } from '@angular/core';
-import { Subscription, catchError, of } from 'rxjs';
+import { catchError, of } from 'rxjs';
+import type { Subscription } from 'rxjs';
 
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';
 import { TimeSourceService } from './time-source.service';
@@ -24,7 +25,7 @@ export class ServerTimeService {
   private currentConfig: SessionTimeoutConfig | null = null;
   private endpoint: string | null = null;
   private retryAttempts = 0;
-  private timerHandle: ReturnType<typeof setTimeout> | null = null;
+  private timerHandle: ReturnType<typeof globalThis.setTimeout> | null = null;
   private inFlight: Subscription | null = null;
 
   configure(config: SessionTimeoutConfig): void {
@@ -157,7 +158,7 @@ export class ServerTimeService {
   private scheduleNextRetry(delayMs: number): void {
     this.clearTimer();
     this.zone.runOutsideAngular(() => {
-      this.timerHandle = setTimeout(() => {
+      this.timerHandle = globalThis.setTimeout(() => {
         this.zone.run(() => this.triggerSync());
       }, delayMs);
     });
@@ -170,7 +171,7 @@ export class ServerTimeService {
     );
     this.clearTimer();
     this.zone.runOutsideAngular(() => {
-      this.timerHandle = setTimeout(() => {
+      this.timerHandle = globalThis.setTimeout(() => {
         this.zone.run(() => this.triggerSync());
       }, interval);
     });

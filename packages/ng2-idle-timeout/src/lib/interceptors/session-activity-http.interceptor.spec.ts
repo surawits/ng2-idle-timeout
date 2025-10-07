@@ -1,6 +1,8 @@
+import { DOCUMENT } from '@angular/common';
 import { HttpContext, HttpHeaders, HttpRequest as AngularHttpRequest } from '@angular/common/http';
 import type { HttpEvent, HttpHandler, HttpRequest } from '@angular/common/http';
 import { of } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
 
 import { SessionActivityHttpInterceptor } from './session-activity-http.interceptor';
 import { getSessionActivityContextToken } from './session-activity-http.context';
@@ -19,6 +21,7 @@ describe('SessionActivityHttpInterceptor', () => {
   let leaderElection: { isLeader: jest.Mock };
   let handler: MockHttpHandler;
   let documentMock: Document;
+  let createInterceptor: () => SessionActivityHttpInterceptor;
 
   const baseConfig: SessionTimeoutConfig = {
     idleGraceMs: 200,
@@ -83,6 +86,7 @@ describe('SessionActivityHttpInterceptor', () => {
   }
 
   beforeEach(() => {
+    TestBed.resetTestingModule();
     sessionTimeout = {
       getConfig: jest.fn().mockReturnValue(baseConfig),
       resetIdle: jest.fn()
@@ -94,16 +98,22 @@ describe('SessionActivityHttpInterceptor', () => {
 
     documentMock = {
       visibilityState: 'visible',
-      hasFocus: jest.fn().mockReturnValue(true)
+      hasFocus: jest.fn().mockReturnValue(true),
+      querySelectorAll: jest.fn().mockReturnValue([])
     } as unknown as Document;
 
     handler = new MockHttpHandler();
 
-    interceptor = new SessionActivityHttpInterceptor(
-      sessionTimeout as unknown as SessionTimeoutService,
-      leaderElection as unknown as LeaderElectionService,
-      documentMock
-    );
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: SessionTimeoutService, useValue: sessionTimeout },
+        { provide: LeaderElectionService, useValue: leaderElection },
+        { provide: DOCUMENT, useValue: documentMock }
+      ]
+    });
+
+    createInterceptor = () => TestBed.runInInjectionContext(() => new SessionActivityHttpInterceptor());
+    interceptor = createInterceptor();
   });
 
   afterEach(() => {
@@ -216,11 +226,7 @@ describe('SessionActivityHttpInterceptor', () => {
   it('enforces cooldown windows between successive activity resets', () => {
     const nowSpy = jest.spyOn(Date, 'now');
     nowSpy.mockReturnValue(5_000);
-    interceptor = new SessionActivityHttpInterceptor(
-      sessionTimeout as unknown as SessionTimeoutService,
-      leaderElection as unknown as LeaderElectionService,
-      documentMock
-    );
+    interceptor = createInterceptor();
 
     sessionTimeout.getConfig.mockReturnValue({
       ...baseConfig,

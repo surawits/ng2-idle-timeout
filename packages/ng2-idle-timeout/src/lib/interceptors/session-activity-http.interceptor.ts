@@ -1,7 +1,6 @@
 ﻿import { DOCUMENT } from '@angular/common';
-import { Inject, Injectable, Optional } from '@angular/core';
-import type { HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
-import { HttpContext } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import type { HttpContext, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
 import type { Observable } from 'rxjs';
 
 import { LeaderElectionService } from '../services/leader-election.service';
@@ -13,12 +12,9 @@ import { getSessionActivityContextToken } from './session-activity-http.context'
 export class SessionActivityHttpInterceptor implements HttpInterceptor {
   private readonly bootstrappedAt = Date.now();
   private cooldownUntil = 0;
-
-  constructor(
-    private readonly sessionTimeout: SessionTimeoutService,
-    @Optional() private readonly leaderElection?: LeaderElectionService,
-    @Optional() @Inject(DOCUMENT) private readonly document?: Document
-  ) {}
+  private readonly sessionTimeout = inject(SessionTimeoutService);
+  private readonly leaderElection = inject(LeaderElectionService, { optional: true });
+  private readonly document = inject(DOCUMENT, { optional: true }) as Document | null;
 
   intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     const config = this.sessionTimeout.getConfig();

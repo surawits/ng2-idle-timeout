@@ -15,6 +15,7 @@ export const SESSION_TIMEOUT_ROUTE_KEY = 'sessionTimeout';
 export const SessionExpiredGuard: CanActivateFn = (route: ActivatedRouteSnapshot, _state: RouterStateSnapshot) => {
   const sessionTimeout = inject(SessionTimeoutService);
   const override = route.data?.[SESSION_TIMEOUT_ROUTE_KEY] as SessionTimeoutRouteConfig | undefined;
+  void _state;
 
   if (override?.config) {
     sessionTimeout.setConfig(override.config);

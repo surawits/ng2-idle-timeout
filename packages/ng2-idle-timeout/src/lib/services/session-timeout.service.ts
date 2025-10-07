@@ -140,7 +140,7 @@ export class SessionTimeoutService {
   private crossTabChannelName: string | null = null;
   private readonly tabId = generateTabId();
   private isHandlingCrossTabMessage = false;
-  private readonly actionDelayTimers = new Map<ActionDelayKey, ReturnType<typeof setTimeout>>();
+  private readonly actionDelayTimers = new Map<ActionDelayKey, ReturnType<typeof globalThis.setTimeout>>();
   private lastAutoActivityResetAt: number | null = null;
   private readonly handleServerSync = () => {
     if (this.configSignal().resumeBehavior === 'autoOnServerSync' && this.snapshotSignal().paused) {
@@ -254,7 +254,7 @@ export class SessionTimeoutService {
       this.applySharedSessionState(persistedSharedState);
     } else {
       this.sharedStateCoordinator.requestSync('initial', true);
-      Promise.resolve().then(() => this.broadcastCrossTab('sync-request'));
+      void Promise.resolve().then(() => this.broadcastCrossTab('sync-request'));
     }
 
     this.sharedStateCoordinator.updates$
@@ -656,7 +656,7 @@ export class SessionTimeoutService {
     this.clearActionTimer(action);
 
     this.zone.runOutsideAngular(() => {
-      const handle = setTimeout(() => {
+      const handle = globalThis.setTimeout(() => {
         this.zone.run(() => {
           work();
         });
@@ -704,7 +704,7 @@ export class SessionTimeoutService {
           this.applyCrossTabReset(message);
           break;
         case 'sync-request':
-          this.handleSyncRequest(message);
+          this.handleSyncRequest();
           break;
         default:
           this.logger.warn('Unknown cross-tab message type', message);
@@ -961,7 +961,7 @@ export class SessionTimeoutService {
         if (typeof queueMicrotask === 'function') {
           queueMicrotask(publish);
         } else {
-          Promise.resolve().then(publish);
+          void Promise.resolve().then(publish);
         }
       } else {
         publish();
@@ -1136,7 +1136,7 @@ export class SessionTimeoutService {
     this.configWriterId = sharedState.config.writerId;
   }
 
-  private handleSyncRequest(message: CrossTabMessage): void {
+  private handleSyncRequest(): void {
     const config = this.configSignal();
     if (config.syncMode === 'leader' && this.leaderElection?.isLeader() === false) {
       return;

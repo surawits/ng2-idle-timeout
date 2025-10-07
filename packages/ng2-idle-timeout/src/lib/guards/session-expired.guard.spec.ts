@@ -1,6 +1,7 @@
 ﻿import { EnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import { ActivatedRouteSnapshot } from '@angular/router';
+import type { RouterStateSnapshot } from '@angular/router';
 
 import { SessionExpiredGuard, SESSION_TIMEOUT_ROUTE_KEY, type SessionTimeoutRouteConfig } from './session-expired.guard';
 import type { SessionTimeoutConfig } from '../models/session-timeout-config';

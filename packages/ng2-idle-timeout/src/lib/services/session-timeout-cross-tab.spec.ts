@@ -430,7 +430,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     leader.stepDown();
     expect(leader.isLeader()).toBe(false);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => globalThis.setTimeout(resolve, 0));
 
     const remoteRecord = { id: 'remote-tab', updatedAt: Date.now() };
     localStorage.setItem(leaderKey, JSON.stringify(remoteRecord));
@@ -442,7 +442,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const staleRecord = { id: 'remote-tab', updatedAt: Date.now() - HEARTBEAT_INTERVAL_MS * 4 };
     localStorage.setItem(leaderKey, JSON.stringify(staleRecord));
     leader.updateConfig(baseConfig);
-    await new Promise(resolve => setTimeout(resolve, HEARTBEAT_INTERVAL_MS));
+    await new Promise(resolve => globalThis.setTimeout(resolve, HEARTBEAT_INTERVAL_MS));
 
     const leaderEvent = captured.find(event => event.type === 'LeaderElected');
     expect(leader.isLeader()).toBe(true);
@@ -463,7 +463,10 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     service.start();
     // Simulate a DOM activity event
-    (service as any).handleExternalActivity({ source: 'dom', at: time.now() }, 'ResetByActivity');
+    const internal = service as unknown as {
+      handleExternalActivity: (event: { source: string; at: number; meta?: Record<string, unknown> }, reason: string) => void;
+    };
+    internal.handleExternalActivity({ source: 'dom', at: time.now() }, 'ResetByActivity');
 
     expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'reset' }));
   });
