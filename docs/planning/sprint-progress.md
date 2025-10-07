@@ -1,7 +1,7 @@
 # Sprint Progress
 
 ## Summary
-- Date: 2025-10-05
+- Date: 2025-10-07
 - Overall status: In Progress
 - Blockers: None
 
@@ -41,7 +41,7 @@
 - 2025-10-06 18:45 - Expanded CP4c coverage for distributed arbitration and coordinator normalization; verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand`.
 - 2025-10-06 19:20 - Completed distributed race/pause coverage and added persisted wake restoration spec; verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/shared-state-coordinator.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand`.
 - 2025-10-06 19:28 - Finalized CP4c distributed coverage (service expire/pause races, persisted wake), verified via focused service/coordinator/cross-tab suites.
-- 2025-10-06 19:30 - Checkpoint 4 – Distributed Mode Implementation marked complete.
+- 2025-10-06 19:30 - Checkpoint 4 â€“ Distributed Mode Implementation marked complete.
 
 - 2025-10-06 20:15 - Kicked off CP5 playground updates: added sync mode selector, diagnostics panel, shared-state controls, and drafted distributed manual validation checklist.
 

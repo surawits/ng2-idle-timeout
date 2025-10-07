@@ -35,7 +35,6 @@
   - Deliverables: multi-tab demo controls, manual validation script, optional smoke tests.
 - [x] Checkpoint 6 - Documentation, Migration, Verification (Done)
   - Deliverables: README updates, migration notes, release notes, verification log, planning sync.
-
 ## Risks & Assumptions
 - Broadcast/storage APIs available in targeted browsers; fallbacks validated.
 - Time source differences reconciled via coordinator metadata.

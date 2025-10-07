@@ -15,7 +15,9 @@ import type {
   SessionTimeoutConfig,
   SessionTimeoutHooks,
   SessionTimeoutPartialConfig,
-  SessionActionDelays
+  SessionActionDelays,
+  HttpActivityPolicyConfig,
+  DomActivityEventName
 } from '../models/session-timeout-config';
 import { SESSION_TIMEOUT_CONFIG, SESSION_TIMEOUT_HOOKS } from '../tokens/config.token';
 import { createLogger, type Logger } from '../utils/logging';
@@ -78,9 +80,12 @@ export class SessionTimeoutService {
   private lastHiddenAt: number | null = null;
   private lastSyncRequestAt: number | null = null;
   private readonly leaderWatcher = this.leaderElection
-    ? effect(() => {
-        this.syncLeaderState();
-      })
+    ? effect(
+        () => {
+          this.syncLeaderState();
+        },
+        { allowSignalWrites: true }
+      )
     : null;
   private readonly handleVisibilityChange = (): void => {
     if (!this.documentRef) {
@@ -107,6 +112,7 @@ export class SessionTimeoutService {
   private readonly storage: StorageAdapter = createStorage();
   private isRestoring = false;
   private isApplyingSharedState = false;
+  private lastConfigWatcherSnapshot: SessionTimeoutConfig | null = null;
 
   private configSignal = signal(
     validateConfig(this.providedConfig as SessionTimeoutPartialConfig | undefined).config
@@ -178,6 +184,15 @@ export class SessionTimeoutService {
 
   private readonly configWatcher = effect(() => {
     const config = this.configSignal();
+    const previousSnapshot = this.lastConfigWatcherSnapshot;
+    const hasChanges = this.configsDiffer(previousSnapshot, config);
+
+    if (!hasChanges && previousSnapshot != null) {
+      this.lastConfigWatcherSnapshot = this.captureConfigSnapshot(config);
+      return;
+    }
+
+    this.lastConfigWatcherSnapshot = this.captureConfigSnapshot(config);
     this.logger = createLogger(config);
     this.restartTicker(config.pollingMs);
     this.domActivity?.updateConfig(config);
@@ -427,6 +442,16 @@ export class SessionTimeoutService {
     const sharedConfigChanged = this.hasSharedConfigDiff(base, config);
     const operationForBroadcast =
       sharedConfigChanged && !this.isApplyingSharedState ? this.resolveConfigOperationForChange(base, config) : null;
+
+    const diffKeys = this.computeConfigDiffKeys(base, config);
+    const configChanged = diffKeys.length > 0;
+
+    if (!configChanged) {
+      if (issues.length > 0) {
+        issues.forEach(issue => this.logger.warn('Invalid config field: ' + issue.field + ' - ' + issue.message));
+      }
+      return;
+    }
 
     this.configSignal.set(config);
 
@@ -798,6 +823,8 @@ export class SessionTimeoutService {
       this.setConfig(configPatch);
 
       const snapshot = sharedState.snapshot;
+      this.lastAutoActivityResetAt = snapshot.lastActivityAt;
+      this.refreshActivityCooldownRemaining();
       this.updateSnapshot(
         {
           state: snapshot.state,
@@ -940,6 +967,139 @@ export class SessionTimeoutService {
         publish();
       }
     }
+
+  }
+  private captureConfigSnapshot(config: SessionTimeoutConfig): SessionTimeoutConfig {
+    const httpActivity = config.httpActivity
+      ? {
+          ...config.httpActivity,
+          allowlist: [...config.httpActivity.allowlist],
+          denylist: [...config.httpActivity.denylist]
+        }
+      : config.httpActivity;
+
+    const actionDelays = config.actionDelays ? { ...config.actionDelays } : config.actionDelays;
+
+    return {
+      ...config,
+      httpActivity,
+      actionDelays,
+      domActivityEvents: [...config.domActivityEvents]
+    };
+  }
+
+  private configsDiffer(previous: SessionTimeoutConfig | null, next: SessionTimeoutConfig): boolean {
+    if (!previous) {
+      return true;
+    }
+    return this.computeConfigDiffKeys(previous, next).length > 0;
+  }
+
+  private computeConfigDiffKeys(
+    previous: SessionTimeoutConfig | null,
+    next: SessionTimeoutConfig
+  ): string[] {
+    const nextRecord = next as unknown as Record<string, unknown>;
+    if (!previous) {
+      return [...Object.keys(nextRecord)];
+    }
+    const prevRecord = previous as unknown as Record<string, unknown>;
+
+    const keys = new Set<string>([...Object.keys(prevRecord), ...Object.keys(nextRecord)]);
+    const changed: string[] = [];
+    keys.forEach(key => {
+      const prevValue = prevRecord[key];
+      const nextValue = nextRecord[key];
+      if (!this.areConfigValuesEqual(key, prevValue, nextValue)) {
+        changed.push(key);
+      }
+    });
+    return changed;
+  }
+
+  private areConfigValuesEqual(key: string, previous: unknown, next: unknown): boolean {
+    if (previous === next) {
+      return true;
+    }
+
+    if (key === 'domActivityEvents' && Array.isArray(previous) && Array.isArray(next)) {
+      return this.areDomEventArraysEqual(
+        previous as ReadonlyArray<DomActivityEventName>,
+        next as ReadonlyArray<DomActivityEventName>
+      );
+    }
+
+    if (typeof previous === 'object' && previous !== null && typeof next === 'object' && next !== null) {
+      if (key === 'httpActivity') {
+        return this.areHttpActivityEqual(previous as HttpActivityPolicyConfig, next as HttpActivityPolicyConfig);
+      }
+      if (key === 'actionDelays') {
+        return this.areActionDelaysEqual(previous as SessionActionDelays, next as SessionActionDelays);
+      }
+      return false;
+    }
+
+    return false;
+  }
+
+  private areDomEventArraysEqual(
+    previous: ReadonlyArray<DomActivityEventName>,
+    next: ReadonlyArray<DomActivityEventName>
+  ): boolean {
+    if (previous.length !== next.length) {
+      return false;
+    }
+    for (let index = 0; index < previous.length; index += 1) {
+      if (previous[index] !== next[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private areHttpActivityEqual(
+    previous: HttpActivityPolicyConfig,
+    next: HttpActivityPolicyConfig
+  ): boolean {
+    return (
+      previous.enabled === next.enabled &&
+      previous.strategy === next.strategy &&
+      previous.headerFlag === next.headerFlag &&
+      previous.contextToken === next.contextToken &&
+      previous.ignoreOnInitMs === next.ignoreOnInitMs &&
+      previous.cooldownMs === next.cooldownMs &&
+      previous.onlyWhenTabFocused === next.onlyWhenTabFocused &&
+      previous.primaryTabOnly === next.primaryTabOnly &&
+      this.areRegExpArraysEqual(previous.allowlist, next.allowlist) &&
+      this.areRegExpArraysEqual(previous.denylist, next.denylist)
+    );
+  }
+
+  private areRegExpArraysEqual(previous: readonly RegExp[], next: readonly RegExp[]): boolean {
+    if (previous.length !== next.length) {
+      return false;
+    }
+    for (let index = 0; index < previous.length; index += 1) {
+      if (previous[index].toString() !== next[index].toString()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private areActionDelaysEqual(
+    previous: SessionActionDelays,
+    next: SessionActionDelays
+  ): boolean {
+    return (
+      previous.start === next.start &&
+      previous.stop === next.stop &&
+      previous.resetIdle === next.resetIdle &&
+      previous.extend === next.extend &&
+      previous.pause === next.pause &&
+      previous.resume === next.resume &&
+      previous.expire === next.expire
+    );
   }
 
   private compareDistributedState(remote: SharedSessionState): number {
@@ -1405,6 +1565,8 @@ export class SessionTimeoutService {
     }
   }
 }
+
+
 
 
 

@@ -84,5 +84,3 @@ items:
   notes: README, migration notes, release notes, verification log, planning sync
   dependencies:
   - cp5-playground
-
-

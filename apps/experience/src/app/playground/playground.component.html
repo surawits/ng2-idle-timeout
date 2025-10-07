@@ -1,7 +1,7 @@
 <section class="page-hero">
   <div class="hero-copy">
     <p class="eyebrow">Playground</p>
-    <h1>Prototype idle and timeout flows without leaving the browser.</h1>
+    <h1>Prototype idle and timeout flows across multiple tabs without leaving the browser.</h1>
     <p class="lead">
       Adjust timers, simulate activity, and watch the session timeline update in real time. Use this sandbox to map the
       configuration that ships to production.
@@ -10,10 +10,20 @@
       <button type="button" class="btn btn-outline-primary rounded-pill" (click)="navigateToDocs()">
         Back to Docs
       </button>
-      <button type="button" class="btn btn-primary rounded-pill" (click)="extend()">
+      <button type="button" class="btn btn-primary rounded-pill" (click)="extend()" [disabled]="isObserverMode">
         <i class="bi bi-plus-circle"></i>
         Extend session
       </button>
+      <a
+        [href]="observerUrl"
+        class="btn btn-outline-secondary rounded-pill"
+        target="_blank"
+        rel="noopener"
+        title="Open a new tab in observer mode"
+      >
+        <i class="bi bi-box-arrow-up-right"></i>
+        Open observer tab
+      </a>
     </div>
     <div class="badge-strip">
       <span *ngFor="let badge of heroBadges" class="badge bg-light text-dark border">{{ badge }}</span>
@@ -34,7 +44,8 @@
 <hr class="section-divider" />
 
 <div class="playground-grid">
-  <div class="card shadow-sm">
+  <ng-container *ngIf="!isObserverMode; else observerConfigCard">
+    <div class="card shadow-sm">
     <div class="card-body">
       <h3 class="card-title">Configuration</h3>
       <h6 class="card-subtitle mb-3 text-muted">Update values to see changes instantly</h6>
@@ -193,7 +204,7 @@
           type="button"
           class="btn btn-outline-primary"
           (click)="extend()"
-          [disabled]="!isSessionActive()"
+          [disabled]="!isSessionActive() || isObserverMode"
         >
           <i class="bi bi-plus-circle"></i>
           Extend
@@ -202,7 +213,7 @@
           type="button"
           class="btn btn-light"
           (click)="resetIdle('dom')"
-          [disabled]="!isSessionActive()"
+          [disabled]="!isSessionActive() || isObserverMode"
         >
           <i class="bi bi-display"></i>
           Simulate DOM activity
@@ -211,7 +222,7 @@
           type="button"
           class="btn btn-light"
           (click)="resetIdle('http')"
-          [disabled]="!isSessionActive()"
+          [disabled]="!isSessionActive() || isObserverMode"
         >
           <i class="bi bi-cloud-arrow-repeat"></i>
           Simulate HTTP activity
@@ -220,7 +231,7 @@
           type="button"
           class="btn btn-outline-success"
           (click)="triggerServerSync()"
-          [disabled]="!isSessionActive()"
+          [disabled]="!isSessionActive() || isObserverMode"
         >
           <i class="bi bi-arrow-repeat"></i>
           Trigger server sync
@@ -228,6 +239,33 @@
       </div>
     </div>
   </div>
+  </ng-container>
+
+  <ng-template #observerConfigCard>
+    <div class="card shadow-sm">
+      <div class="card-body d-flex flex-column gap-3">
+        <div>
+          <h3 class="card-title">Observer tab</h3>
+          <h6 class="card-subtitle text-muted">Mirrors the primary tab’s session without changing shared configuration</h6>
+        </div>
+        <div class="alert alert-info small mb-0" role="alert">
+          Need to tweak settings? Use the primary tab. Observer mode keeps the service connected, mirrors shared state,
+          and is safe to leave open on a second monitor.
+        </div>
+        <div class="border rounded-3 p-3">
+          <h6 class="text-uppercase text-muted small mb-2">Current configuration</h6>
+          <table class="table table-sm align-middle mb-0">
+            <tbody>
+              <tr *ngFor="let item of observerConfigRows()">
+                <th scope="row" class="text-muted small">{{ item.label }}</th>
+                <td class="font-monospace text-break">{{ item.value }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </ng-template>
 
   <div class="card shadow-sm">
     <div class="card-body">

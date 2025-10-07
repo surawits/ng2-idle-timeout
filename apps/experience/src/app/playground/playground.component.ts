@@ -1,7 +1,7 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   SessionTimeoutService,
   SharedStateCoordinatorService,
@@ -46,6 +46,7 @@ export class PlaygroundComponent {
   private readonly sessionTimeout = inject(SessionTimeoutService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly sharedStateCoordinator = inject(SharedStateCoordinatorService);
   private readonly initialConfig = this.sessionTimeout.getConfig();
   private readonly syncModeStorageKey = 'experience-playground-sync-mode';
@@ -63,6 +64,8 @@ export class PlaygroundComponent {
     { value: 'distributed', label: 'Distributed (multi-writer)' }
   ];
   selectedSyncMode: SessionSyncMode = this.initialConfig.syncMode;
+  readonly observerUrl: string;
+  readonly isObserverMode: boolean;
 
   idleGraceSeconds = 60;
   countdownSeconds = 300;
@@ -119,6 +122,28 @@ export class PlaygroundComponent {
     ];
   });
 
+  readonly observerConfigRows = computed<MetadataItem[]>(() => {
+    const config = this.configState();
+    return [
+      { label: 'Sync mode', value: this.syncModeLabel(config.syncMode) },
+      { label: 'Idle grace', value: Math.round(config.idleGraceMs / 1000) + ' s' },
+      { label: 'Countdown', value: Math.round(config.countdownMs / 1000) + ' s' },
+      { label: 'Warn before expiry', value: Math.round(config.warnBeforeMs / 1000) + ' s' },
+      { label: 'Activity cooldown', value: Math.round(config.activityResetCooldownMs / 1000) + ' s' },
+      {
+        label: 'Auto resume',
+        value: config.resumeBehavior === 'manual' ? 'Disabled' : 'autoOnServerSync'
+      },
+      {
+        label: 'DOM events',
+        value:
+          config.domActivityEvents.length > 0
+            ? config.domActivityEvents.map(event => this.domEventLabel(event)).join(', ')
+            : 'None'
+      }
+    ];
+  });
+
   readonly sharedLeaderInfo = computed(() => {
     const state = this.sharedState();
     if (!state?.leader) {
@@ -133,9 +158,15 @@ export class PlaygroundComponent {
 
   readonly snapshot = computed(() => this.sessionTimeout.getSnapshot());
   readonly sessionState = computed(() => this.snapshot().state);
-  readonly isSessionActive = computed(() => this.serviceActive());
-  readonly isSessionPaused = computed(() => this.serviceActive() && this.snapshot().paused);
-  readonly isWarnState = computed(() => this.serviceActive() && this.sessionState() === 'WARN');
+  readonly isSessionActive = computed(() => {
+    if (this.serviceActive()) {
+      return true;
+    }
+    const shared = this.sharedState();
+    return shared ? shared.snapshot.idleStartAt != null : false;
+  });
+  readonly isSessionPaused = computed(() => this.isSessionActive() && this.snapshot().paused);
+  readonly isWarnState = computed(() => this.isSessionActive() && this.sessionState() === 'WARN');
   readonly visibleSessionState = computed(() => (this.isSessionActive() ? this.sessionState() : 'Stopped'));
 
   readonly sessionBadgeClass = computed(() => {
@@ -153,16 +184,10 @@ export class PlaygroundComponent {
   });
 
   readonly idleRemainingSeconds = computed(() => {
-    if (!this.isSessionActive()) {
-      return 0;
-    }
     return Math.max(0, Math.ceil(this.sessionTimeout.idleRemainingMsSignal() / 1000));
   });
 
   readonly countdownRemainingSeconds = computed(() => {
-    if (!this.isSessionActive()) {
-      return 0;
-    }
     return Math.max(0, Math.ceil(this.sessionTimeout.countdownRemainingMsSignal() / 1000));
   });
 
@@ -171,16 +196,10 @@ export class PlaygroundComponent {
   });
 
   readonly totalRemainingSeconds = computed(() => {
-    if (!this.isSessionActive()) {
-      return 0;
-    }
     return Math.max(0, Math.ceil(this.sessionTimeout.totalRemainingMsSignal() / 1000));
   });
 
   readonly warningModalCountdownSeconds = computed(() => {
-    if (!this.isSessionActive()) {
-      return 0;
-    }
     const state = this.sessionTimeout.stateSignal();
     if (state === 'WARN' || state === 'EXPIRED' || state === 'IDLE') {
       return 0;
@@ -197,9 +216,6 @@ export class PlaygroundComponent {
   });
 
   readonly warningModalTargetDate = computed(() => {
-    if (!this.isSessionActive()) {
-      return null;
-    }
     const countdownEndAt = this.snapshot().countdownEndAt;
     if (countdownEndAt == null) {
       return null;
@@ -216,6 +232,9 @@ export class PlaygroundComponent {
   });
 
   constructor() {
+    this.isObserverMode = this.route.snapshot.queryParamMap.get('observer') === '1';
+    this.observerUrl = this.router.serializeUrl(this.router.createUrlTree([], { queryParams: { observer: '1' } }));
+
     const storedSyncMode = this.readStoredSyncMode();
     if (storedSyncMode) {
       this.selectedSyncMode = storedSyncMode;
@@ -227,11 +246,13 @@ export class PlaygroundComponent {
     const persistedState = this.sharedStateCoordinator.readPersistedState();
     if (persistedState) {
       this.sharedStateInternal.set(persistedState);
+      this.serviceActive.set(persistedState.snapshot.idleStartAt != null);
     }
 
     const sharedStateSub = this.sharedStateCoordinator.updates$.subscribe(message => {
       if (message.type === 'state') {
         this.sharedStateInternal.set(message.state);
+        this.serviceActive.set(message.state.snapshot.idleStartAt != null);
       }
     });
 
@@ -239,13 +260,12 @@ export class PlaygroundComponent {
       if (event.type === 'ConfigChanged') {
         this.syncLocalConfigInputs(this.sessionTimeout.getConfig());
       }
-
-      if (!this.serviceActive()) {
-        if (event.type !== 'Stopped') {
-          this.sessionTimeout.stop();
-        }
-        return;
+      if (event.type === 'Started') {
+        this.serviceActive.set(true);
+      } else if (event.type === 'Stopped') {
+        this.serviceActive.set(false);
       }
+
       const metaSummary = this.summariseMeta(event.meta);
       const view: EventView = {
         type: event.type,
@@ -276,6 +296,9 @@ export class PlaygroundComponent {
   }
 
   applyConfig(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     const domActivityEvents = this.currentDomActivityEvents();
     this.sessionTimeout.setConfig({
       idleGraceMs: this.idleGraceSeconds * 1000,
@@ -298,6 +321,9 @@ export class PlaygroundComponent {
   }
 
   toggleDomEvent(event: DomActivityEventName, change: Event): void {
+    if (this.isObserverMode) {
+      return;
+    }
     const target = change.target;
     const enabled = target instanceof HTMLInputElement ? target.checked : false;
     if (enabled) {
@@ -309,6 +335,9 @@ export class PlaygroundComponent {
   }
 
   onSyncModeChange(mode: SessionSyncMode | string): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (mode === 'leader' || mode === 'distributed') {
       this.selectedSyncMode = mode;
       this.persistSyncMode(mode);
@@ -381,6 +410,9 @@ export class PlaygroundComponent {
   }
 
   start(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (this.serviceActive()) {
       return;
     }
@@ -393,6 +425,9 @@ export class PlaygroundComponent {
   }
 
   stop(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive()) {
       return;
     }
@@ -401,6 +436,9 @@ export class PlaygroundComponent {
   }
 
   pause(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive() || this.isSessionPaused()) {
       return;
     }
@@ -408,6 +446,9 @@ export class PlaygroundComponent {
   }
 
   resume(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive() || !this.isSessionPaused()) {
       return;
     }
@@ -415,6 +456,9 @@ export class PlaygroundComponent {
   }
 
   extend(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive()) {
       return;
     }
@@ -422,10 +466,16 @@ export class PlaygroundComponent {
   }
 
   staySignedIn(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     this.resetIdle('manual');
   }
 
   expireSession(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive()) {
       return;
     }
@@ -433,6 +483,9 @@ export class PlaygroundComponent {
   }
 
   resetIdle(source: 'dom' | 'http' | 'manual'): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive()) {
       return;
     }
@@ -440,6 +493,9 @@ export class PlaygroundComponent {
   }
 
   triggerServerSync(): void {
+    if (this.isObserverMode) {
+      return;
+    }
     if (!this.serviceActive()) {
       return;
     }

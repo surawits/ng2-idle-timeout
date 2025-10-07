@@ -21,6 +21,7 @@ export class AppComponent {
     { label: 'Home', routerLink: '/' },
     { label: 'Documentation', routerLink: '/docs' },
     { label: 'Playground', routerLink: '/playground' },
+    { label: 'Observer Tab', externalUrl: '/playground?observer=1', target: '_blank' },
     { label: 'FAQ', routerLink: '/faq' },
     { label: 'GitHub', externalUrl: 'https://github.com/ng2-idle-timeout', target: '_blank' }
   ];
