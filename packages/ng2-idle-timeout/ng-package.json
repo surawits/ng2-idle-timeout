@@ -14,6 +14,11 @@
                        "input":  "schematics/dist",
                        "glob":  "**/*",
                        "output":  "schematics/dist"
+                   },
+                   {
+                       "input":  ".",
+                       "glob":  "README.md",
+                       "output":  "."
                    }
                ]
 }
