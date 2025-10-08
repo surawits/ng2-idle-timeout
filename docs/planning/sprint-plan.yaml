@@ -147,3 +147,10 @@ items:
   notes: focused tests, docs/planning updates
   dependencies:
   - cp9c-warning-reset-fix
+- id: cp10-pages-deploy
+  title: Checkpoint 10 – Playground deployment automation
+  owner: codex
+  status: Done
+  notes: GitHub Pages workflow for apps/experience, artifact upload, docs sync
+  dependencies:
+  - cp9d-verification

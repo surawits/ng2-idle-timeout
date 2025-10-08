@@ -48,6 +48,8 @@
     - [x] 9b Patch root injector config flow and add guardrails.
     - [x] 9c Fix warning reset regression after manual extend.
     - [x] 9d Verification, documentation sync, and planning updates.
+- [x] Checkpoint 10 – Playground Deployment Automation
+  - Deliverables: GitHub Pages workflow building `apps/experience`, automated artifact upload, deployment documentation updates.
 ## Risks & Assumptions
 - Broadcast/storage APIs available in targeted browsers; fallbacks validated.
 - Time source differences reconciled via coordinator metadata.

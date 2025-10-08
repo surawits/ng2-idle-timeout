@@ -23,6 +23,11 @@
 - cp8c-warning-tests: Done
 - cp8d-warning-docs: Done
 - cp8e-warning-verification: Done
+- cp9a-config-repro: Done
+- cp9b-config-fix: Done
+- cp9c-warning-reset-fix: Done
+- cp9d-verification: Done
+- cp10-pages-deploy: Done
 
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
@@ -71,3 +76,4 @@
 - 2025-10-09 10:05 - Captured AppModule config regression scenario and added provider bootstrap specs covering NgModule and APP_INITIALIZER flows.
 - 2025-10-09 10:20 - Implemented config initializer provider to rehydrate `SessionTimeoutService` on boot; validated with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/provide-session-timeout.spec.ts`.
 - 2025-10-09 10:35 - Fixed post-extend warning reset suppression, updated `shouldResetForSource`, and extended service specs (`npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/session-timeout.service.spec.ts`).
+- 2025-10-09 11:15 - Completed CP10 playground deployment automation: added `.github/workflows/deploy-pages.yml` to build `apps/experience` with GitHub Pages base href and deploy the artifact.
