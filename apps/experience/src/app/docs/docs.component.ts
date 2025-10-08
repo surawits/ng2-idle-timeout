@@ -60,7 +60,8 @@ export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
   idleGraceMs: 60_000,
   countdownMs: 300_000,
   warnBeforeMs: 60_000,
-  resumeBehavior: 'autoOnServerSync'
+  resumeBehavior: 'autoOnServerSync',
+  resetOnWarningActivity: true
 };
 
 export const sessionTimeoutProviders = createSessionTimeoutProviders(defaultSessionTimeoutConfig);`;
@@ -80,7 +81,8 @@ bootstrapApplication(AppComponent, {
       idleGraceMs: 60_000,
       countdownMs: 300_000,
       warnBeforeMs: 60_000,
-      resumeBehavior: 'autoOnServerSync'
+      resumeBehavior: 'autoOnServerSync',
+      resetOnWarningActivity: true
     }))
   ]
 });`;
@@ -162,6 +164,7 @@ export class SessionStatusComponent {
     { key: 'resumeBehavior', defaultValue: 'manual', description: 'Keep manual resume or set `autoOnServerSync` when the backend confirms the session.' },
     { key: 'httpActivity.strategy', defaultValue: 'allowlist', description: 'HTTP auto-reset mode (`allowlist`, `headerFlag`, `aggressive`).' },
     { key: 'logging', defaultValue: 'warn', description: 'Raise to `debug` or `trace` for verbose diagnostics.' },
+    { key: 'resetOnWarningActivity', defaultValue: 'true', description: 'Auto-reset WARN/countdown when keyboard, mouse, scroll, or HTTP activity is detected. Switch to `false` to require explicit confirmation.' },
     { key: 'ignoreUserActivityWhenPaused', defaultValue: 'false', description: 'Ignore DOM/router activity while paused to avoid unfreezing inadvertently.' },
     { key: 'allowManualExtendWhenExpired', defaultValue: 'false', description: 'Permit manual extend calls after expiry when business rules require it.' }
   ];
@@ -244,6 +247,7 @@ export class SessionStatusComponent {
   readonly customActivityTips = [
     'Build domain-specific activity sources (websocket heartbeats, service worker messages, analytics beacons).',
     'Emit analytics whenever `Warn` or `Expired` occurs to understand dwell time and churn.',
+    'When `resetOnWarningActivity` is disabled, watch `activity$` for `resetSuppressedReason` so support teams can explain why warnings stayed active.',
     'In tests, override `TimeSourceService` to deterministically advance timers and assert lifecycle events.'
   ];
 

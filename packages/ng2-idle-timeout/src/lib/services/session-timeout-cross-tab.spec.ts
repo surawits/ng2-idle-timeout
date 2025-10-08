@@ -143,6 +143,7 @@ describe('SessionTimeoutService cross-tab sync', () => {
     timeSource: 'client',
     serverTimeEndpoint: undefined,
     logging: 'silent',
+    resetOnWarningActivity: true,
     ignoreUserActivityWhenPaused: false,
     allowManualExtendWhenExpired: false
   };
@@ -265,6 +266,8 @@ describe('SessionTimeoutService cross-tab sync', () => {
       storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
       syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
       resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
+      resetOnWarningActivity:
+        overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
       ignoreUserActivityWhenPaused:
         overrides?.config?.ignoreUserActivityWhenPaused ?? baseConfig.ignoreUserActivityWhenPaused,
       allowManualExtendWhenExpired:
@@ -499,6 +502,44 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const idleStartAfter = snapshot().idleStartAt;
     expect(idleStartAfter).toBeGreaterThan(idleStartBefore!);
     expect(idleStartAfter).toBe(activityTime);
+  });
+
+  it('ignores cross-tab reset when warning resets are disabled', () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    jest.spyOn(leader, 'isLeader').mockReturnValue(true);
+    service.setConfig({ resetOnWarningActivity: false });
+
+    const activities: Array<{ source: string; meta?: Record<string, unknown> }> = [];
+    service.activity$.subscribe(activity => activities.push({ source: activity.source, meta: activity.meta }));
+
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+    const idleStartBefore = snapshot().idleStartAt;
+
+    const channel = broadcastMock.__getChannel(channelName);
+    expect(channel).toBeDefined();
+
+    channel!.emit({
+      sourceId: 'remote-tab',
+      type: 'reset',
+      at: time.now(),
+      payload: { activitySource: 'dom' }
+    } satisfies CrossTabMessage);
+
+    manualTick();
+
+    expect(snapshot().idleStartAt).toBe(idleStartBefore);
+    const lastActivity = activities[activities.length - 1];
+    expect(lastActivity?.source).toBe('cross-tab');
+    expect(lastActivity?.meta).toMatchObject({
+      resetSuppressed: true,
+      resetSuppressedReason: 'warning-phase-disabled',
+      activitySource: 'dom'
+    });
   });
 
   it('broadcasts shared state in response to sync requests', async () => {

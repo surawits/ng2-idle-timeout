@@ -139,6 +139,10 @@
           </tr>
         </tbody>
       </table>
+      <p class="helper">
+        Disable <code>resetOnWarningActivity</code> when warnings should require manual acknowledgement—suppressed events still surface on
+        <code>activity$</code> via <code>resetSuppressed</code> and <code>resetSuppressedReason</code> metadata so analytics and UIs can explain why the timer did not reset.
+      </p>
       <div class="code-block">
         <pre><code>{{ timingDiagram }}</code></pre>
       </div>

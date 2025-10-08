@@ -84,3 +84,38 @@ items:
   notes: README, migration notes, release notes, verification log, planning sync
   dependencies:
   - cp5-playground
+- id: cp8a-warning-config
+  title: 8a Config surface for warning activity reset
+  owner: codex
+  status: Done
+  notes: models, defaults, validation, persistence, shared state payloads
+  dependencies:
+  - cp6-docs
+- id: cp8b-warning-service
+  title: 8b Session timeout service behaviour updates
+  owner: codex
+  status: Done
+  notes: activity handling, cross-tab resets, priority rules
+  dependencies:
+  - cp8a-warning-config
+- id: cp8c-warning-tests
+  title: 8c Warning activity reset tests
+  owner: codex
+  status: Done
+  notes: unit and integration specs for DOM/HTTP activity across flag states
+  dependencies:
+  - cp8b-warning-service
+- id: cp8d-warning-docs
+  title: 8d Warning activity reset docs & playground
+  owner: codex
+  status: Done
+  notes: README, migration notes, experience playground toggle
+  dependencies:
+  - cp8c-warning-tests
+- id: cp8e-warning-verification
+  title: 8e Warning activity reset verification
+  owner: codex
+  status: Done
+  notes: targeted test/build runs, planning record sync
+  dependencies:
+  - cp8d-warning-docs

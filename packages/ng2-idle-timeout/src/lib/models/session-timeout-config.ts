@@ -65,6 +65,7 @@ export interface SessionTimeoutConfig {
   timeSource: 'client' | 'server';
   serverTimeEndpoint?: string;
   logging: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'silent';
+  resetOnWarningActivity: boolean;
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
   resumeBehavior?: 'manual' | 'autoOnServerSync';

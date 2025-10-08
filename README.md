@@ -78,13 +78,14 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
    import { createSessionTimeoutProviders } from 'ng2-idle-timeout';
    import type { SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
 
-   export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
-     storageKeyPrefix: 'app-session',
-     idleGraceMs: 60_000,
-     countdownMs: 300_000,
-     warnBeforeMs: 60_000,
-     resumeBehavior: 'autoOnServerSync'
-   };
+  export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
+    storageKeyPrefix: 'app-session',
+    idleGraceMs: 60_000,
+    countdownMs: 300_000,
+    warnBeforeMs: 60_000,
+    resumeBehavior: 'autoOnServerSync',
+    resetOnWarningActivity: true
+  };
 
    export const sessionTimeoutProviders = createSessionTimeoutProviders(defaultSessionTimeoutConfig);
    ```
@@ -105,15 +106,16 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
    bootstrapApplication(AppComponent, {
      providers: [
        provideRouter(routes),
-       provideSessionTimeout(() => ({
-         storageKeyPrefix: 'app-session',
-         idleGraceMs: 60_000,
-         countdownMs: 300_000,
-         warnBeforeMs: 60_000,
-         resumeBehavior: 'autoOnServerSync'
-       }))
-     ]
-   });
+      provideSessionTimeout(() => ({
+        storageKeyPrefix: 'app-session',
+        idleGraceMs: 60_000,
+        countdownMs: 300_000,
+        warnBeforeMs: 60_000,
+        resumeBehavior: 'autoOnServerSync',
+        resetOnWarningActivity: true
+      }))
+    ]
+  });
    ```
 
    **NgModule bootstrap (`app.module.ts`)**
@@ -226,8 +228,11 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
 | `resumeBehavior` | `'manual'` | Keep manual resume (default) or enable `'autoOnServerSync'` when the backend confirms session validity. |
 | `httpActivity.strategy` | `'allowlist'` | HTTP auto-reset mode (`'allowlist'`, `'headerFlag'`, or `'aggressive'`). |
 | `logging` | `'warn'` | Emit verbose diagnostics when set to `'debug'` or `'trace'`. |
+| `resetOnWarningActivity` | `true` | Automatically treat keyboard/mouse/scroll/HTTP activity during the countdown/warn phase as a reset. Switch to `false` when you want visible prompts to require explicit user acknowledgement. |
 | `ignoreUserActivityWhenPaused` | `false` | Ignore DOM/router activity while paused to prevent accidental resumes. |
 | `allowManualExtendWhenExpired` | `false` | Allow operators to extend even after expiry when business rules permit it. |
+
+When `resetOnWarningActivity` is disabled, lower-priority events (DOM, router, cross-tab) no longer reset the countdown automatically. Those suppressed attempts still emit on `activity$` with `resetSuppressed` / `resetSuppressedReason` metadata so dashboards and UIs can explain why the timer stayed in WARN.
 
 **Timing cheat sheet (example)**
 

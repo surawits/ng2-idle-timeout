@@ -221,6 +221,7 @@ describe('SessionTimeoutService', () => {
     timeSource: 'client',
     serverTimeEndpoint: undefined,
     logging: 'silent',
+    resetOnWarningActivity: true,
     ignoreUserActivityWhenPaused: false,
     allowManualExtendWhenExpired: false,
     resumeBehavior: 'manual'
@@ -355,6 +356,8 @@ describe('SessionTimeoutService', () => {
       storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
       syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
       resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
+      resetOnWarningActivity:
+        overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
       ignoreUserActivityWhenPaused:
         overrides?.config?.ignoreUserActivityWhenPaused ?? baseConfig.ignoreUserActivityWhenPaused,
       allowManualExtendWhenExpired:
@@ -489,6 +492,151 @@ describe('SessionTimeoutService', () => {
 
     expect(snapshot().state).toBe('IDLE');
     expect(snapshot().remainingMs).toBe(baseConfig.countdownMs);
+  });
+  it.each(['mousemove', 'keydown', 'scroll'])('resets warn state on %s activity when resetOnWarningActivity is true', eventType => {
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+
+    domService.emit({ type: eventType });
+
+    expect(snapshot().state).toBe('IDLE');
+    expect(snapshot().remainingMs).toBe(baseConfig.countdownMs);
+  });
+
+  it.each(['mousemove', 'keydown', 'scroll'])('suppresses %s activity during warn when resetOnWarningActivity is false', eventType => {
+    service.setConfig({ resetOnWarningActivity: false });
+    const activities: ActivityEvent[] = [];
+    service.activity$.subscribe(activity => activities.push(activity));
+
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+    const idleStartBefore = snapshot().idleStartAt;
+
+    domService.emit({ type: eventType });
+
+    expect(snapshot().state).toBe('WARN');
+    expect(snapshot().idleStartAt).toBe(idleStartBefore);
+    const lastActivity = activities[activities.length - 1];
+    expect(lastActivity?.meta).toMatchObject({
+      resetSuppressed: true,
+      resetSuppressedReason: 'warning-phase-disabled',
+      activitySource: 'dom',
+      stateAtActivity: 'WARN'
+    });
+  });
+
+  it('resets warn state on HTTP activity when resetOnWarningActivity is true', () => {
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+
+    service.resetIdle({ method: 'GET', url: '/api/keepalive' }, { source: 'http' });
+
+    expect(snapshot().state).toBe('IDLE');
+  });
+
+  it('suppresses http-triggered reset during warn when resetOnWarningActivity is false', () => {
+    service.setConfig({ resetOnWarningActivity: false });
+    const activities: ActivityEvent[] = [];
+    const events: Array<{ type: string; meta?: Record<string, unknown> }> = [];
+    service.activity$.subscribe(activity => activities.push(activity));
+    service.events$.subscribe(event => events.push({ type: event.type, meta: event.meta as Record<string, unknown> | undefined }));
+
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+    const idleStartBefore = snapshot().idleStartAt;
+    const resetEventsBefore = events.length;
+
+    service.resetIdle({ method: 'POST', url: '/api/action' }, { source: 'http' });
+
+    expect(snapshot().state).toBe('WARN');
+    expect(snapshot().idleStartAt).toBe(idleStartBefore);
+    expect(events.length).toBe(resetEventsBefore);
+    const lastActivity = activities[activities.length - 1];
+    expect(lastActivity?.meta).toMatchObject({
+      resetSuppressed: true,
+      resetSuppressedReason: 'warning-phase-disabled',
+      activitySource: 'http'
+    });
+  });
+
+  it('allows manual reset during warn when resetOnWarningActivity is false', () => {
+    service.setConfig({ resetOnWarningActivity: false });
+    const activities: ActivityEvent[] = [];
+    const events: Array<{ type: string; meta?: Record<string, unknown> }> = [];
+    service.activity$.subscribe(activity => activities.push(activity));
+    service.events$.subscribe(event => events.push({ type: event.type, meta: event.meta as Record<string, unknown> | undefined }));
+
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+
+    service.resetIdle();
+
+    expect(snapshot().state).toBe('IDLE');
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).toBe('ResetByActivity');
+    expect(lastEvent.meta).toMatchObject({ activitySource: 'manual' });
+    const manualActivity = activities[activities.length - 1];
+    expect(manualActivity?.source).toBe('manual');
+    expect(manualActivity?.meta?.resetSuppressed).toBeUndefined();
+  });
+
+  it('gives manual reset priority over lower-priority activity', () => {
+    jest.useFakeTimers();
+    try {
+      service.setConfig({
+        actionDelays: {
+          ...baseConfig.actionDelays,
+          resetIdle: 25
+        }
+      });
+
+      service.start();
+      time.advance(baseConfig.idleGraceMs + 1);
+      manualTick();
+      time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+      manualTick();
+      expect(snapshot().state).toBe('WARN');
+
+      const activities: ActivityEvent[] = [];
+      service.activity$.subscribe(activity => activities.push(activity));
+
+      service.resetIdle(undefined, { source: 'manual' });
+      domService.emit({ type: 'click' });
+
+      const suppressed = activities[activities.length - 1];
+      expect(suppressed?.meta).toMatchObject({
+        resetSuppressed: true,
+        resetSuppressedReason: 'lower-priority',
+        activitySource: 'dom'
+      });
+
+      jest.advanceTimersByTime(25);
+      manualTick();
+
+      expect(snapshot().state).toBe('IDLE');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('ignores DOM activity while paused when configured to do so', () => {

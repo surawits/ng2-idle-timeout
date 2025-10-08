@@ -145,6 +145,8 @@ describe('SharedStateCoordinatorService', () => {
       storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
       syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
       resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
+      resetOnWarningActivity:
+        overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
       ignoreUserActivityWhenPaused:
         overrides?.config?.ignoreUserActivityWhenPaused ?? baseConfig.ignoreUserActivityWhenPaused,
       allowManualExtendWhenExpired:

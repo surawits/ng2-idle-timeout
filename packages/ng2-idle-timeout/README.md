@@ -226,8 +226,11 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
 | `resumeBehavior` | `'manual'` | Keep manual resume (default) or enable `'autoOnServerSync'` when the backend confirms session validity. |
 | `httpActivity.strategy` | `'allowlist'` | HTTP auto-reset mode (`'allowlist'`, `'headerFlag'`, or `'aggressive'`). |
 | `logging` | `'warn'` | Emit verbose diagnostics when set to `'debug'` or `'trace'`. |
+| `resetOnWarningActivity` | `true` | Automatically reset the session when keyboard, mouse, scroll, or HTTP activity occurs during the countdown/warn phase. Set to `false` to require manual intervention once a warning is visible. |
 | `ignoreUserActivityWhenPaused` | `false` | Ignore DOM/router activity while paused to prevent accidental resumes. |
 | `allowManualExtendWhenExpired` | `false` | Allow operators to extend even after expiry when business rules permit it. |
+
+When the warning phase is active the service keeps a deterministic priority order: `manual` > `http` > `router` > `dom`/`cross-tab`. Lower-priority activity that gets ignored exposes `resetSuppressed` and `resetSuppressedReason` metadata through `activity$` so UIs and analytics can explain why a reset did not occur.
 
 **Timing cheat sheet (example)**
 

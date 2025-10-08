@@ -48,6 +48,7 @@ interface SerializedConfig {
   timeSource: SessionTimeoutConfig['timeSource'];
   serverTimeEndpoint?: string;
   logging: SessionTimeoutConfig['logging'];
+  resetOnWarningActivity: boolean;
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
 }
@@ -184,6 +185,7 @@ function serializeConfig(config: SessionTimeoutConfig): SerializedConfig {
     timeSource: config.timeSource,
     serverTimeEndpoint: config.serverTimeEndpoint,
     logging: config.logging,
+    resetOnWarningActivity: config.resetOnWarningActivity,
     ignoreUserActivityWhenPaused: config.ignoreUserActivityWhenPaused,
     allowManualExtendWhenExpired: config.allowManualExtendWhenExpired
   };
@@ -236,6 +238,7 @@ function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
     timeSource: serialized.timeSource,
     serverTimeEndpoint: serialized.serverTimeEndpoint,
     logging: serialized.logging,
+    resetOnWarningActivity: serialized.resetOnWarningActivity ?? DEFAULT_SESSION_TIMEOUT_CONFIG.resetOnWarningActivity,
     ignoreUserActivityWhenPaused: serialized.ignoreUserActivityWhenPaused,
     allowManualExtendWhenExpired: serialized.allowManualExtendWhenExpired
   };

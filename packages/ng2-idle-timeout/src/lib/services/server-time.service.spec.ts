@@ -47,6 +47,7 @@ const baseConfig: SessionTimeoutConfig = {
   timeSource: 'client',
   serverTimeEndpoint: undefined,
   logging: 'silent',
+  resetOnWarningActivity: true,
   ignoreUserActivityWhenPaused: false,
   allowManualExtendWhenExpired: false
 };

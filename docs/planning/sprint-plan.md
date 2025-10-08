@@ -35,6 +35,13 @@
   - Deliverables: multi-tab demo controls, manual validation script, optional smoke tests.
 - [x] Checkpoint 6 - Documentation, Migration, Verification (Done)
   - Deliverables: README updates, migration notes, release notes, verification log, planning sync.
+- [ ] Checkpoint 8 - Warning Activity Reset Option
+  - Sub-checkpoints:
+    - [x] 8a Config surface updates for `resetOnWarningActivity` (models, defaults, validation, persistence, shared state).
+    - [x] 8b SessionTimeoutService activity handling and priority rules.
+    - [x] 8c Unit & integration coverage for DOM/HTTP activity across flag states.
+    - [x] 8d Documentation, migration notes, and playground toggle.
+    - [x] 8e Verification runs and planning record sync.
 ## Risks & Assumptions
 - Broadcast/storage APIs available in targeted browsers; fallbacks validated.
 - Time source differences reconciled via coordinator metadata.

@@ -75,6 +75,7 @@ export class PlaygroundComponent {
   warnBeforeSeconds = 60;
   activityCooldownSeconds = 5;
   autoResume = true;
+  resetOnWarningActivity = this.initialConfig.resetOnWarningActivity;
 
   readonly heroBadges = ['Real-time events', 'Cross-tab ready', 'Server sync'];
 
@@ -138,6 +139,10 @@ export class PlaygroundComponent {
       {
         label: 'Auto resume',
         value: config.resumeBehavior === 'manual' ? 'Disabled' : 'autoOnServerSync'
+      },
+      {
+        label: 'Reset on warning activity',
+        value: config.resetOnWarningActivity ? 'Enabled' : 'Disabled'
       },
       {
         label: 'DOM events',
@@ -316,6 +321,7 @@ export class PlaygroundComponent {
       warnBeforeMs: this.warnBeforeSeconds * 1000,
       activityResetCooldownMs: this.activityCooldownSeconds * 1000,
       resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',
+      resetOnWarningActivity: this.resetOnWarningActivity,
       domActivityEvents,
       syncMode: this.selectedSyncMode
     });
@@ -412,6 +418,7 @@ export class PlaygroundComponent {
     this.warnBeforeSeconds = Math.round(config.warnBeforeMs / 1000);
     this.activityCooldownSeconds = Math.round(config.activityResetCooldownMs / 1000);
     this.autoResume = config.resumeBehavior !== 'manual';
+    this.resetOnWarningActivity = config.resetOnWarningActivity;
     this.domEventSelection = new Set<DomActivityEventName>(config.domActivityEvents);
     this.selectedSyncMode = config.syncMode;
     this.persistSyncMode(config.syncMode);
@@ -643,7 +650,16 @@ export class PlaygroundComponent {
       return undefined;
     }
     const entries = Object.entries(meta)
-      .filter(([key, value]) => key !== 'activitySource' && key !== 'type' && value !== undefined && value !== null && value !== '')
+      .filter(
+        ([key, value]) =>
+          key !== 'activitySource' &&
+          key !== 'type' &&
+          key !== 'resetSuppressed' &&
+          key !== 'resetSuppressedReason' &&
+          value !== undefined &&
+          value !== null &&
+          value !== ''
+      )
       .map(([key, value]) => key + ': ' + String(value));
     return entries.length > 0 ? entries.join(', ') : undefined;
   }
@@ -653,10 +669,24 @@ export class PlaygroundComponent {
     const rawType = meta['type'];
     const type = typeof rawType === 'string' ? rawType : activity.source;
     const detailEntries = Object.entries(meta)
-      .filter(([key, value]) => key !== 'type' && key !== 'activitySource' && value !== undefined && value !== null && value !== '')
+      .filter(
+        ([key, value]) =>
+          key !== 'type' &&
+          key !== 'activitySource' &&
+          key !== 'resetSuppressed' &&
+          key !== 'resetSuppressedReason' &&
+          value !== undefined &&
+          value !== null &&
+          value !== ''
+      )
       .map(([key, value]) => key + ': ' + String(value));
 
-    const summary = type === activity.source ? activity.source : activity.source + ' • ' + type;
+    let summary = type === activity.source ? activity.source : activity.source + ' -> ' + type;
+    if (meta['resetSuppressed'] === true) {
+      const reason =
+        typeof meta['resetSuppressedReason'] === 'string' ? meta['resetSuppressedReason'] : 'suppressed';
+      summary += ' (suppressed: ' + reason + ')';
+    }
 
     return {
       at: activity.at,
@@ -700,3 +730,5 @@ export class PlaygroundComponent {
       .join(' ');
   }
 }
+
+

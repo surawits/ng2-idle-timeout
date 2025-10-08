@@ -318,6 +318,10 @@ export class SharedStateCoordinatorService {
       storageKeyPrefix: record.storageKeyPrefix,
       syncMode: record.syncMode === 'distributed' ? 'distributed' : 'leader',
       resumeBehavior: record.resumeBehavior,
+      resetOnWarningActivity:
+        typeof record.resetOnWarningActivity === 'boolean'
+          ? record.resetOnWarningActivity
+          : DEFAULT_SESSION_TIMEOUT_CONFIG.resetOnWarningActivity,
       ignoreUserActivityWhenPaused: record.ignoreUserActivityWhenPaused,
       allowManualExtendWhenExpired: record.allowManualExtendWhenExpired,
       revision:
@@ -430,6 +434,7 @@ export class SharedStateCoordinatorService {
     const syncMode = record['syncMode'];
     const ignoreUserActivityWhenPaused = record['ignoreUserActivityWhenPaused'];
     const allowManualExtendWhenExpired = record['allowManualExtendWhenExpired'];
+    const resetOnWarningActivity = record['resetOnWarningActivity'];
     const resumeValid =
       resumeBehavior === undefined || resumeBehavior === 'manual' || resumeBehavior === 'autoOnServerSync';
     return (
@@ -441,7 +446,8 @@ export class SharedStateCoordinatorService {
       typeof syncMode === 'string' &&
       resumeValid &&
       typeof ignoreUserActivityWhenPaused === 'boolean' &&
-      typeof allowManualExtendWhenExpired === 'boolean'
+      typeof allowManualExtendWhenExpired === 'boolean' &&
+      (resetOnWarningActivity === undefined || typeof resetOnWarningActivity === 'boolean')
     );
   }
 

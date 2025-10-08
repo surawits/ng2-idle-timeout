@@ -14,6 +14,7 @@ It has two routes:
 
 ## Playground quick tour
 - Use the **Sync mode** selector to switch between *Leader* and *Distributed* coordination.
+- Flip **Reset on warning activity** to see how the new flag suppresses automatic resets during WARN and surfaces the suppression reason in the activity log.
 - The **Shared state diagnostics** card exposes snapshot and config metadata, a mismatch banner, and quick actions to
   request sync, reload the persisted snapshot, or clear shared storage.
 - Standard controls (extend, pause, simulate activity) broadcast across open tabs so you can observe reconciliation

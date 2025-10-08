@@ -64,6 +64,7 @@ describe('SessionActivityHttpInterceptor', () => {
     timeSource: 'client',
     serverTimeEndpoint: undefined,
     logging: 'silent',
+    resetOnWarningActivity: true,
     ignoreUserActivityWhenPaused: false,
     allowManualExtendWhenExpired: false
   };

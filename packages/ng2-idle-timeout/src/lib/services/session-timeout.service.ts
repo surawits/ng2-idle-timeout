@@ -142,6 +142,7 @@ export class SessionTimeoutService {
   private isHandlingCrossTabMessage = false;
   private readonly actionDelayTimers = new Map<ActionDelayKey, ReturnType<typeof globalThis.setTimeout>>();
   private lastAutoActivityResetAt: number | null = null;
+  private pendingResetPriority: number | null = null;
   private readonly handleServerSync = () => {
     if (this.configSignal().resumeBehavior === 'autoOnServerSync' && this.snapshotSignal().paused) {
       this.zone.run(() => this.resume());
@@ -346,15 +347,50 @@ export class SessionTimeoutService {
 
   resetIdle(meta?: Record<string, unknown>, options?: { source?: ActivityEvent['source'] }): void {
     const source = options?.source ?? 'manual';
-    const metaWithSource = { ...(meta ?? {}), activitySource: source };
+    const priority = this.getResetPriority(source);
+    const config = this.configSignal();
+    const snapshot = this.snapshotSignal();
+    const blockedByWarning = !this.shouldResetForSource(source, snapshot, config);
+    const blockedByPriority = this.pendingResetPriority != null && priority < this.pendingResetPriority;
+
+    const metaWithSource: Record<string, unknown> = {
+      ...(meta ?? {}),
+      activitySource: source,
+      activityTimestamp: this.timeSource.now(),
+      stateAtActivity: snapshot.state,
+      resetPriority: priority
+    };
+
+    if (blockedByWarning || blockedByPriority) {
+      metaWithSource['resetSuppressed'] = true;
+      metaWithSource['resetSuppressedReason'] =
+        blockedByWarning ? 'warning-phase-disabled' : 'lower-priority';
+      this.emitActivity(source, metaWithSource);
+      return;
+    }
+
     this.emitActivity(source, metaWithSource);
-    this.executeWithDelay('resetIdle', () => {
+
+    const scheduled = this.scheduleResetIdle(source, priority, config, () => {
+      const latestSnapshot = this.snapshotSignal();
+      const latestConfig = this.configSignal();
+      if (!this.shouldResetForSource(source, latestSnapshot, latestConfig)) {
+        return;
+      }
       if (this.leaderElection?.isLeader() === false) {
         this.broadcastCrossTab('reset', { activitySource: source });
         return;
       }
-      this.resetIdleInternal('ResetByActivity', metaWithSource);
+      const resetMeta = {
+        ...metaWithSource,
+        stateAtReset: latestSnapshot.state
+      };
+      this.resetIdleInternal('ResetByActivity', resetMeta);
     });
+
+    if (!scheduled) {
+      return;
+    }
   }
 
   extend(meta?: Record<string, unknown>): void {
@@ -573,25 +609,64 @@ export class SessionTimeoutService {
       }
     }
 
-    const meta = {
+    const snapshot = this.snapshotSignal();
+    const priority = this.getResetPriority(activity.source);
+    const blockedByPause = snapshot.paused && config.ignoreUserActivityWhenPaused;
+    const blockedByWarning = !this.shouldResetForSource(activity.source, snapshot, config);
+    const blockedByPriority = this.pendingResetPriority != null && priority < this.pendingResetPriority;
+
+    const meta: Record<string, unknown> = {
       ...(activity.meta ?? {}),
       activitySource: activity.source,
-      activityTimestamp: activity.at
+      activityTimestamp: activity.at,
+      stateAtActivity: snapshot.state,
+      resetPriority: priority
     };
-    this.emitActivity(activity.source, activity.meta);
-    const snapshot = this.snapshotSignal();
-    if (snapshot.paused && config.ignoreUserActivityWhenPaused) {
+
+    const shouldSchedule = !(blockedByPause || blockedByWarning || blockedByPriority);
+
+    if (!shouldSchedule) {
+      meta['resetSuppressed'] = true;
+      if (blockedByPause) {
+        meta['resetSuppressedReason'] = 'paused';
+      } else if (blockedByWarning) {
+        meta['resetSuppressedReason'] = 'warning-phase-disabled';
+      } else {
+        meta['resetSuppressedReason'] = 'lower-priority';
+      }
+    }
+
+    this.emitActivity(activity.source, meta);
+
+    if (!shouldSchedule) {
+      this.refreshActivityCooldownRemaining(now, config);
       return;
     }
-    this.lastAutoActivityResetAt = now;
-    this.refreshActivityCooldownRemaining(now, config);
-    this.executeWithDelay('resetIdle', () => {
+
+    const scheduled = this.scheduleResetIdle(activity.source, priority, config, () => {
+      const latestSnapshot = this.snapshotSignal();
+      const latestConfig = this.configSignal();
+      if (!this.shouldResetForSource(activity.source, latestSnapshot, latestConfig)) {
+        return;
+      }
       if (this.leaderElection?.isLeader() === false) {
         this.broadcastCrossTab('reset', { activitySource: activity.source });
         return;
       }
-      this.resetIdleInternal(eventType, meta);
+      const resetMeta = {
+        ...meta,
+        stateAtReset: latestSnapshot.state
+      };
+      this.resetIdleInternal(eventType, resetMeta);
     });
+
+    if (!scheduled) {
+      this.refreshActivityCooldownRemaining(now, config);
+      return;
+    }
+
+    this.lastAutoActivityResetAt = now;
+    this.refreshActivityCooldownRemaining(now, config);
   }
 
   private setupCrossTabChannel(config: SessionTimeoutConfig): void {
@@ -678,6 +753,9 @@ export class SessionTimeoutService {
     for (const [key, handle] of this.actionDelayTimers.entries()) {
       clearTimeout(handle);
       this.actionDelayTimers.delete(key);
+      if (key === 'resetIdle') {
+        this.pendingResetPriority = null;
+      }
     }
   }
 
@@ -759,8 +837,36 @@ export class SessionTimeoutService {
   }
 
   private applyCrossTabReset(message: CrossTabMessage): void {
-    const source = message.payload?.activitySource ?? 'cross-tab';
-    this.resetIdleInternal('ResetByActivity', { crossTab: true, sourceTabId: message.sourceId, activitySource: source });
+    const activitySource = (message.payload?.activitySource ?? 'cross-tab') as ActivityEvent['source'];
+    const config = this.configSignal();
+    const snapshot = this.snapshotSignal();
+    const priority = this.getResetPriority(activitySource);
+    const blockedByWarning = !this.shouldResetForSource(activitySource, snapshot, config);
+    const blockedByPriority = this.pendingResetPriority != null && priority < this.pendingResetPriority;
+
+    const meta: Record<string, unknown> = {
+      crossTab: true,
+      sourceTabId: message.sourceId,
+      activitySource,
+      stateAtActivity: snapshot.state,
+      resetPriority: priority
+    };
+
+    if (blockedByWarning || blockedByPriority) {
+      meta['resetSuppressed'] = true;
+      meta['resetSuppressedReason'] =
+        blockedByWarning ? 'warning-phase-disabled' : 'lower-priority';
+      this.emitActivity('cross-tab', meta);
+      return;
+    }
+
+    this.emitActivity('cross-tab', meta);
+
+    const resetMeta = {
+      ...meta,
+      stateAtReset: this.snapshotSignal().state
+    };
+    this.resetIdleInternal('ResetByActivity', resetMeta);
   }
 
   private applyCrossTabSync(message: CrossTabMessage): void {
@@ -816,6 +922,7 @@ export class SessionTimeoutService {
         storageKeyPrefix: sharedState.config.storageKeyPrefix,
         syncMode: sharedState.config.syncMode,
         resumeBehavior: sharedState.config.resumeBehavior,
+        resetOnWarningActivity: sharedState.config.resetOnWarningActivity,
         ignoreUserActivityWhenPaused: sharedState.config.ignoreUserActivityWhenPaused,
         allowManualExtendWhenExpired: sharedState.config.allowManualExtendWhenExpired
       };
@@ -917,6 +1024,7 @@ export class SessionTimeoutService {
         storageKeyPrefix: config.storageKeyPrefix,
         syncMode: config.syncMode,
         resumeBehavior: config.resumeBehavior,
+        resetOnWarningActivity: config.resetOnWarningActivity,
         ignoreUserActivityWhenPaused: config.ignoreUserActivityWhenPaused,
         allowManualExtendWhenExpired: config.allowManualExtendWhenExpired,
         revision: this.sharedConfigRevision,
@@ -1484,6 +1592,7 @@ export class SessionTimeoutService {
       previous.storageKeyPrefix !== next.storageKeyPrefix ||
       previous.syncMode !== next.syncMode ||
       previous.resumeBehavior !== next.resumeBehavior ||
+      previous.resetOnWarningActivity !== next.resetOnWarningActivity ||
       previous.ignoreUserActivityWhenPaused !== next.ignoreUserActivityWhenPaused ||
       previous.allowManualExtendWhenExpired !== next.allowManualExtendWhenExpired
     );
@@ -1500,6 +1609,66 @@ export class SessionTimeoutService {
       return 'bootstrap';
     }
     return 'config-change';
+  }
+
+  private shouldResetForSource(
+    source: ActivityEvent['source'],
+    snapshot: SessionSnapshot,
+    config: SessionTimeoutConfig
+  ): boolean {
+    if (source === 'manual') {
+      return true;
+    }
+    if (snapshot.state === 'COUNTDOWN' || snapshot.state === 'WARN') {
+      return config.resetOnWarningActivity;
+    }
+    return true;
+  }
+
+  private getResetPriority(source: ActivityEvent['source']): number {
+    switch (source) {
+      case 'manual':
+        return 400;
+      case 'http':
+        return 300;
+      case 'router':
+        return 250;
+      case 'dom':
+        return 200;
+      case 'cross-tab':
+      default:
+        return 150;
+    }
+  }
+
+  private scheduleResetIdle(
+    source: ActivityEvent['source'],
+    priority: number,
+    config: SessionTimeoutConfig,
+    work: () => void
+  ): boolean {
+    if (this.pendingResetPriority != null && priority < this.pendingResetPriority) {
+      return false;
+    }
+
+    const configuredDelay = Math.max(0, config.actionDelays.resetIdle ?? 0);
+    const wrappedWork = () => {
+      try {
+        work();
+      } finally {
+        this.pendingResetPriority = null;
+      }
+    };
+
+    if (configuredDelay <= 0) {
+      this.pendingResetPriority = priority;
+      this.executeWithDelay('resetIdle', wrappedWork);
+      return true;
+    }
+
+    this.executeWithDelay('resetIdle', wrappedWork);
+    this.pendingResetPriority = priority;
+    return true;
   }
 
   private emitEvent(type: SessionEvent['type'], meta?: Record<string, unknown>): void {

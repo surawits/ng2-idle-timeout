@@ -35,6 +35,7 @@ export interface SharedConfigPayload {
   storageKeyPrefix: string;
   syncMode: SessionSyncMode;
   resumeBehavior: 'manual' | 'autoOnServerSync' | undefined;
+  resetOnWarningActivity: boolean;
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
   revision: number;

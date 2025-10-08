@@ -18,6 +18,11 @@
 - cp4c-distributed-tests: Done
 - cp5-playground: Done
 - cp6-docs: Done
+- cp8a-warning-config: Done
+- cp8b-warning-service: Done
+- cp8c-warning-tests: Done
+- cp8d-warning-docs: Done
+- cp8e-warning-verification: Done
 
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
@@ -57,3 +62,9 @@
 - 2025-10-07 15:55 - Cleared lint debt for publishing, reran unit tests/build, and packed `ng2-idle-timeout@0.3.0` with README.
 - 2025-10-08 09:20 - Kicked off CP7 provider reliability hotfix after reports that `sessionTimeoutProviders` bootstraps failed without HttpClient; capturing diagnostics and mitigation plan.
 - 2025-10-08 12:15 - Completed CP7 fix: made `ServerTimeService` tolerate missing HttpClient, introduced `createSessionTimeoutProviders`/`provideSessionTimeout`, refreshed docs & schematics, and verified with `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/server-time.service.spec.ts` plus `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/session-timeout.service.spec.ts`.
+- 2025-10-08 22:05 - Added Checkpoint 8 plan for warning activity reset option, synced planning documents, and queued implementation steps.
+- 2025-10-08 22:20 - Completed CP8a config surface updates covering defaults, validation, persistence, and shared-state payloads for `resetOnWarningActivity`.
+- 2025-10-08 22:45 - Completed CP8b service behaviour updates: guarded countdown/warn resets with the new flag, added source priority tracking, and ensured cross-tab resets respect local policy.
+- 2025-10-08 22:55 - Completed CP8c warning activity reset test suite covering keyboard, mouse, scroll, HTTP, and cross-tab scenarios for both flag states with priority assertions (`npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts`).
+- 2025-10-08 23:10 - Completed CP8d documentation and playground updates: README/migration notes for `resetOnWarningActivity`, plus playground toggle and activity log messaging for suppressed events.
+- 2025-10-08 23:25 - Completed CP8e verification: `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts` and `npm run demo:test` succeeded.

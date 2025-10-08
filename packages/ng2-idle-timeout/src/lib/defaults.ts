@@ -60,6 +60,7 @@ export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   timeSource: 'client',
   serverTimeEndpoint: undefined,
   logging: 'warn',
+  resetOnWarningActivity: true,
   ignoreUserActivityWhenPaused: false,
   allowManualExtendWhenExpired: false
 };
