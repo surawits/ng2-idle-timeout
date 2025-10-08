@@ -1619,7 +1619,7 @@ export class SessionTimeoutService {
     if (source === 'manual') {
       return true;
     }
-    if (snapshot.state === 'COUNTDOWN' || snapshot.state === 'WARN') {
+    if (snapshot.state === 'WARN') {
       return config.resetOnWarningActivity;
     }
     return true;

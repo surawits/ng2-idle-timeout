@@ -119,3 +119,31 @@ items:
   notes: targeted test/build runs, planning record sync
   dependencies:
   - cp8d-warning-docs
+- id: cp9a-config-repro
+  title: 9a Reproduce global config injection regression
+  owner: codex
+  status: Done
+  notes: confirm AppModule provider flow and capture failing spec
+  dependencies:
+  - cp8e-warning-verification
+- id: cp9b-config-fix
+  title: 9b Patch root injector config flow
+  owner: codex
+  status: Done
+  notes: implement fix and add guardrails/tests
+  dependencies:
+  - cp9a-config-repro
+- id: cp9c-warning-reset-fix
+  title: 9c Fix warning reset after extend
+  owner: codex
+  status: Done
+  notes: adjust behaviour and cover with specs
+  dependencies:
+  - cp9b-config-fix
+- id: cp9d-verification
+  title: 9d Verification & planning sync
+  owner: codex
+  status: Done
+  notes: focused tests, docs/planning updates
+  dependencies:
+  - cp9c-warning-reset-fix

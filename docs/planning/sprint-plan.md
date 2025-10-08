@@ -42,6 +42,12 @@
     - [x] 8c Unit & integration coverage for DOM/HTTP activity across flag states.
     - [x] 8d Documentation, migration notes, and playground toggle.
     - [x] 8e Verification runs and planning record sync.
+- [ ] Checkpoint 9 – Post-Release Bugfixes
+  - Sub-checkpoints:
+    - [x] 9a Reproduce global config injection regression.
+    - [x] 9b Patch root injector config flow and add guardrails.
+    - [x] 9c Fix warning reset regression after manual extend.
+    - [x] 9d Verification, documentation sync, and planning updates.
 ## Risks & Assumptions
 - Broadcast/storage APIs available in targeted browsers; fallbacks validated.
 - Time source differences reconciled via coordinator metadata.

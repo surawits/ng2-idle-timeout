@@ -600,6 +600,27 @@ describe('SessionTimeoutService', () => {
     expect(manualActivity?.meta?.resetSuppressed).toBeUndefined();
   });
 
+  it('allows activity resets after extending when resetOnWarningActivity is false', () => {
+    service.setConfig({ resetOnWarningActivity: false });
+
+    service.start();
+    time.advance(baseConfig.idleGraceMs + 1);
+    manualTick();
+    time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
+    manualTick();
+    expect(snapshot().state).toBe('WARN');
+
+    service.extend();
+    manualTick();
+
+    expect(snapshot().state).toBe('COUNTDOWN');
+
+    domService.emit({ type: 'click' });
+
+    expect(snapshot().state).toBe('IDLE');
+    expect(snapshot().remainingMs).toBe(baseConfig.countdownMs);
+  });
+
   it('gives manual reset priority over lower-priority activity', () => {
     jest.useFakeTimers();
     try {

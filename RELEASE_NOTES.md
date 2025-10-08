@@ -13,6 +13,16 @@
 - npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/server-time.service.spec.ts
 - npm run demo:test
 
+## Patch 0.3.3 (2025-10-09)
+
+### Highlights
+- Ensured the provided config from `createSessionTimeoutProviders`/`provideSessionTimeout` is applied automatically at bootstrap so AppModule consumers no longer call `setConfig` manually.
+- Fixed suppressed activity resets after manual extends when `resetOnWarningActivity` is disabled.
+
+### Verification
+- npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/provide-session-timeout.spec.ts
+- npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/session-timeout.service.spec.ts
+
 # Sprint 6 Release Notes
 
 ## Highlights

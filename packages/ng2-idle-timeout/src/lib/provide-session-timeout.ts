@@ -1,4 +1,4 @@
-import { EnvironmentProviders, Provider, makeEnvironmentProviders } from '@angular/core';
+import { APP_INITIALIZER, EnvironmentProviders, Injector, Optional, Provider, makeEnvironmentProviders } from '@angular/core';
 
 import type { SessionTimeoutPartialConfig } from './models/session-timeout-config';
 import { SESSION_TIMEOUT_CONFIG } from './tokens/config.token';
@@ -16,11 +16,28 @@ export function createSessionTimeoutProviders(
   config: SessionTimeoutConfigInput
 ): Provider[] {
   const factory = () => resolveConfig(config);
+  const initializerFactory = (
+    injector: Injector,
+    providedConfig: SessionTimeoutPartialConfig | null | undefined
+  ) => () => {
+    if (!providedConfig) {
+      return;
+    }
+    const service = injector.get(SessionTimeoutService);
+    service.setConfig(providedConfig);
+  };
+
   return [
-    SessionTimeoutService,
     {
       provide: SESSION_TIMEOUT_CONFIG,
       useFactory: factory
+    },
+    SessionTimeoutService,
+    {
+      provide: APP_INITIALIZER,
+      multi: true,
+      deps: [Injector, [new Optional(), SESSION_TIMEOUT_CONFIG]],
+      useFactory: initializerFactory
     }
   ];
 }
@@ -30,4 +47,3 @@ export function provideSessionTimeout(
 ): EnvironmentProviders {
   return makeEnvironmentProviders(createSessionTimeoutProviders(config));
 }
-
