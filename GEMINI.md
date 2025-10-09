@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This repository contains the `ng2-idle-timeout` library, an Angular package for managing session timeouts. It is designed to be "zoneless" and works with Angular versions 16-20. The library provides services and utilities to track user activity, manage countdowns, and handle session expiration across multiple browser tabs. It uses Angular signals for change detection.
+This repository contains the `ng2-idle-timeout` library, an Angular package for managing session timeouts. It is designed to be "zoneless" and works with Angular versions 16+. The library provides services and utilities to track user activity, manage countdowns, and handle session expiration across multiple browser tabs. It uses Angular signals for change detection.
 
 ### Project Structure
 

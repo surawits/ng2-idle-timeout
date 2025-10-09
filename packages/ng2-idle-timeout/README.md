@@ -1,6 +1,6 @@
 # ng2-idle-timeout
 
-> Zoneless-friendly session timeout orchestration for Angular 16-20.
+> Zoneless-friendly session timeout orchestration for Angular 16+.
 
 > Crafted by Codex.
 
@@ -49,7 +49,7 @@
 
 | Package            | Angular | Node    | RxJS      |
 |--------------------|---------|---------|-----------|
-| `ng2-idle-timeout` | 16-20   | >=18.13 | >=7.5 < 9 |
+| `ng2-idle-timeout` | 16+     | >=18.13 | >=7.5 < 9 |
 
 ---
 
