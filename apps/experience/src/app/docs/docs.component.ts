@@ -17,7 +17,7 @@ export class DocsComponent {
 
   readonly craftedByLabel = 'Crafted by Codex';
 
-  readonly heroBadges = ['Leader or distributed', 'Cross-tab safe', 'Server aligned'];
+  readonly heroBadges = ['Leader coordination', 'Cross-tab safe', 'Server aligned'];
 
   readonly sectionNav = [
     { label: 'Overview & Concepts', href: '#overview' },
@@ -30,7 +30,7 @@ export class DocsComponent {
   readonly overviewHighlights = [
     'Coordinate idle, countdown, warn, and expire flows with Angular signals plus observable mirrors.',
     'Synchronise state across tabs with BroadcastChannel, local storage, and Lamport-ordered writers.',
-    'Stay zoneless-friendly while supporting leader and distributed consensus for active-active tabs.'
+    'Stay zoneless-friendly while coordinating idle state across tabs with a single leader.'
   ];
 
 
@@ -155,7 +155,6 @@ export class SessionStatusComponent {
 </section>`;
 
   readonly configOptions = [
-    { key: 'syncMode', defaultValue: 'leader', description: 'Coordination mode. Use `leader` to centralise writes or `distributed` for Lamport consensus.' },
     { key: 'idleGraceMs', defaultValue: '120000', description: 'Milliseconds the session may remain idle before countdown begins.' },
     { key: 'countdownMs', defaultValue: '3600000', description: 'Countdown window in milliseconds before expiry fires.' },
     { key: 'warnBeforeMs', defaultValue: '300000', description: 'Warn threshold inside the countdown when prompts should surface.' },
@@ -234,8 +233,7 @@ export class SessionStatusComponent {
 
   readonly crossTabTips = [
     'Share a `storageKeyPrefix` across tabs so extends and expiries propagate instantly.',
-    'Set `syncMode: "distributed"` when every tab must publish updates; Lamport clocks deterministically pick the winning snapshot.',
-    'Observe `LeaderElected` events in leader mode or monitor metadata revisions in distributed mode to decide where background jobs run.'
+    'Observe `LeaderElected` events to decide where background jobs run and review metadata revisions to audit shared-state changes.'
   ];
 
 

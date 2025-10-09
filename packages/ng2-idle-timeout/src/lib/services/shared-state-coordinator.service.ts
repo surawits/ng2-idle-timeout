@@ -236,7 +236,6 @@ export class SharedStateCoordinatorService {
 
   private normalizeState(state: LegacySharedSessionState | SharedSessionState): SharedSessionState {
     const updatedAt = typeof state.updatedAt === 'number' ? state.updatedAt : this.timeSource.now();
-    const syncMode = state.syncMode === 'distributed' ? 'distributed' : 'leader';
     const leader = state.leader && this.isLeaderInfo(state.leader) ? state.leader : null;
     const snapshot = this.normalizeSnapshot(state.snapshot);
     const config = this.normalizeConfig(state.config);
@@ -244,7 +243,6 @@ export class SharedStateCoordinatorService {
     return {
       version: SHARED_STATE_VERSION,
       updatedAt,
-      syncMode,
       leader,
       metadata,
       snapshot,
@@ -316,7 +314,6 @@ export class SharedStateCoordinatorService {
       warnBeforeMs: record.warnBeforeMs,
       activityResetCooldownMs: record.activityResetCooldownMs,
       storageKeyPrefix: record.storageKeyPrefix,
-      syncMode: record.syncMode === 'distributed' ? 'distributed' : 'leader',
       resumeBehavior: record.resumeBehavior,
       resetOnWarningActivity:
         typeof record.resetOnWarningActivity === 'boolean'
@@ -394,9 +391,8 @@ export class SharedStateCoordinatorService {
     if (leader != null && !this.isLeaderInfo(leader)) {
       return false;
     }
-    const syncMode = record['syncMode'];
     const updatedAt = record['updatedAt'];
-    return typeof updatedAt === 'number' && (syncMode === 'leader' || syncMode === 'distributed');
+    return typeof updatedAt === 'number';
   }
 
   private isSharedSnapshot(snapshot: unknown): snapshot is SharedSessionState['snapshot'] {
@@ -431,20 +427,25 @@ export class SharedStateCoordinatorService {
     const warnBeforeMs = record['warnBeforeMs'];
     const activityResetCooldownMs = record['activityResetCooldownMs'];
     const storageKeyPrefix = record['storageKeyPrefix'];
-    const syncMode = record['syncMode'];
     const ignoreUserActivityWhenPaused = record['ignoreUserActivityWhenPaused'];
     const allowManualExtendWhenExpired = record['allowManualExtendWhenExpired'];
     const resetOnWarningActivity = record['resetOnWarningActivity'];
+    const syncMode = record['syncMode'];
     const resumeValid =
       resumeBehavior === undefined || resumeBehavior === 'manual' || resumeBehavior === 'autoOnServerSync';
+    const syncModeValid =
+      syncMode === undefined ||
+      syncMode === 'leader' ||
+      syncMode === 'distributed' ||
+      typeof syncMode === 'string';
     return (
       typeof idleGraceMs === 'number' &&
       typeof countdownMs === 'number' &&
       typeof warnBeforeMs === 'number' &&
       typeof activityResetCooldownMs === 'number' &&
       typeof storageKeyPrefix === 'string' &&
-      typeof syncMode === 'string' &&
       resumeValid &&
+      syncModeValid &&
       typeof ignoreUserActivityWhenPaused === 'boolean' &&
       typeof allowManualExtendWhenExpired === 'boolean' &&
       (resetOnWarningActivity === undefined || typeof resetOnWarningActivity === 'boolean')

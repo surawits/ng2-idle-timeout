@@ -1,4 +1,4 @@
-goal: Implement cross-tab sync with selectable leader/distributed modes
+goal: Implement cross-tab sync with leader coordination (distributed mode removed in CP9f)
 owner: codex
 items:
 - id: cp1-discovery
@@ -147,6 +147,20 @@ items:
   notes: focused tests, docs/planning updates
   dependencies:
   - cp9c-warning-reset-fix
+- id: cp9e-extend-idle-reset
+  title: 9e Restore idle timer on manual extend
+  owner: codex
+  status: Done
+  notes: SessionTimeoutService manual extend idle reset fix, cross-tab alignment, targeted specs
+  dependencies:
+  - cp9d-verification
+- id: cp9f-distributed-removal
+  title: 9f Remove distributed mode
+  owner: codex
+  status: Done
+  notes: Remove distributed coordination, update docs/playground
+  dependencies:
+  - cp9d-verification
 - id: cp10-pages-deploy
   title: Checkpoint 10 – Playground deployment automation
   owner: codex

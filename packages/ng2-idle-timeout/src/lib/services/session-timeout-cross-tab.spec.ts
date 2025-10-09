@@ -112,7 +112,6 @@ describe('SessionTimeoutService cross-tab sync', () => {
     activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
-    syncMode: 'leader',
     strategy: 'userOnly',
     httpActivity: {
       enabled: false,
@@ -264,7 +263,6 @@ describe('SessionTimeoutService cross-tab sync', () => {
       activityResetCooldownMs:
         overrides?.config?.activityResetCooldownMs ?? baseConfig.activityResetCooldownMs,
       storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
-      syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
       resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
       resetOnWarningActivity:
         overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
@@ -280,7 +278,6 @@ describe('SessionTimeoutService cross-tab sync', () => {
     return {
       version: SHARED_STATE_VERSION,
       updatedAt: overrides?.updatedAt ?? now,
-      syncMode: overrides?.syncMode ?? 'leader',
       leader: overrides?.leader ?? null,
       metadata,
       snapshot,
@@ -302,7 +299,8 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const extendMessage = extendMessages[0];
     expect(extendMessage.type).toBe('extend');
     expect(typeof extendMessage.sourceId).toBe('string');
-    expect(extendMessage.payload?.snapshot?.state).toBe('COUNTDOWN');
+    expect(extendMessage.payload?.snapshot?.state).toBe('IDLE');
+    expect(extendMessage.payload?.snapshot?.countdownEndAt).toBeNull();
   });
 
   it('applies remote extend snapshot into local state', () => {
@@ -311,11 +309,14 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
 
+    const remoteSnapshotNow = time.now();
     const remoteSnapshot: SessionSnapshot = {
       ...snapshot(),
-      state: 'COUNTDOWN',
-      countdownEndAt: time.now() + 1500,
-      remainingMs: 1500,
+      state: 'IDLE',
+      idleStartAt: remoteSnapshotNow,
+      lastActivityAt: remoteSnapshotNow,
+      countdownEndAt: null,
+      remainingMs: baseConfig.countdownMs,
       paused: false
     };
 
@@ -330,8 +331,10 @@ describe('SessionTimeoutService cross-tab sync', () => {
     } satisfies CrossTabMessage);
 
     const current = snapshot();
-    expect(current.state).toBe('COUNTDOWN');
+    expect(current.state).toBe('IDLE');
     expect(current.remainingMs).toBe(remoteSnapshot.remainingMs);
+    expect(current.idleStartAt).toBe(remoteSnapshot.idleStartAt);
+    expect(current.countdownEndAt).toBeNull();
     expect(events).toContain('Extended');
   });
 
@@ -377,14 +380,12 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(channel).toBeDefined();
 
     const sharedState = buildSharedState({
-      syncMode: 'distributed',
       config: {
         idleGraceMs: 180,
         countdownMs: 1600,
         warnBeforeMs: 400,
         activityResetCooldownMs: 20,
         storageKeyPrefix: baseConfig.storageKeyPrefix,
-        syncMode: 'distributed',
         resumeBehavior: 'autoOnServerSync',
         ignoreUserActivityWhenPaused: true,
         allowManualExtendWhenExpired: true
@@ -407,7 +408,6 @@ describe('SessionTimeoutService cross-tab sync', () => {
     } satisfies CrossTabMessage);
 
     const updatedConfig = service.getConfig();
-    expect(updatedConfig.syncMode).toBe('distributed');
     expect(updatedConfig.idleGraceMs).toBe(180);
     expect(updatedConfig.countdownMs).toBe(1600);
     expect(updatedConfig.warnBeforeMs).toBe(400);
@@ -566,7 +566,6 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const syncMessage = messages.find(message => message.type === 'sync');
     expect(syncMessage).toBeDefined();
     expect(syncMessage?.payload?.sharedState?.version).toBe(SHARED_STATE_VERSION);
-    expect(syncMessage?.payload?.sharedState?.config.syncMode).toBe('leader');
   });
 
   it('requests shared-state sync from coordinator when leadership is lost', async () => {

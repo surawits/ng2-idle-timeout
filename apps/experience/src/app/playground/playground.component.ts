@@ -8,7 +8,6 @@ import {
   DOM_ACTIVITY_EVENT_NAMES,
   DEFAULT_SESSION_TIMEOUT_CONFIG,
   type DomActivityEventName,
-  type SessionSyncMode,
   type SessionTimeoutConfig,
   type SharedSessionState
 } from 'ng2-idle-timeout';
@@ -52,7 +51,6 @@ export class PlaygroundComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly sharedStateCoordinator = inject(SharedStateCoordinatorService);
   private readonly initialConfig = this.sessionTimeout.getConfig();
-  private readonly syncModeStorageKey = 'experience-playground-sync-mode';
 
   readonly coordinatorSourceId = this.sharedStateCoordinator.getSourceId();
 
@@ -62,11 +60,6 @@ export class PlaygroundComponent {
   );
   domEventSelection = new Set<DomActivityEventName>(this.initialConfig.domActivityEvents);
 
-  readonly syncModeOptions: Array<{ value: SessionSyncMode; label: string }> = [
-    { value: 'leader', label: 'Leader (single writer)' },
-    { value: 'distributed', label: 'Distributed (multi-writer)' }
-  ];
-  selectedSyncMode: SessionSyncMode = this.initialConfig.syncMode;
   readonly observerUrl: string;
   readonly isObserverMode: boolean;
 
@@ -121,7 +114,6 @@ export class PlaygroundComponent {
       return [];
     }
     return [
-      { label: 'Sync mode', value: this.syncModeLabel(state.config.syncMode) },
       { label: 'Revision', value: state.config.revision.toString() },
       { label: 'Logical clock', value: state.config.logicalClock.toString() },
       { label: 'Writer ID', value: state.config.writerId }
@@ -131,7 +123,6 @@ export class PlaygroundComponent {
   readonly observerConfigRows = computed<MetadataItem[]>(() => {
     const config = this.configState();
     return [
-      { label: 'Sync mode', value: this.syncModeLabel(config.syncMode) },
       { label: 'Idle grace', value: Math.round(config.idleGraceMs / 1000) + ' s' },
       { label: 'Countdown', value: Math.round(config.countdownMs / 1000) + ' s' },
       { label: 'Warn before expiry', value: Math.round(config.warnBeforeMs / 1000) + ' s' },
@@ -249,11 +240,6 @@ export class PlaygroundComponent {
     this.isObserverMode = this.route.snapshot.queryParamMap.get('observer') === '1';
     this.observerUrl = this.router.serializeUrl(this.router.createUrlTree([], { queryParams: { observer: '1' } }));
 
-    const storedSyncMode = this.readStoredSyncMode();
-    if (storedSyncMode) {
-      this.selectedSyncMode = storedSyncMode;
-    }
-
     this.applyConfig();
     this.sessionTimeout.stop();
 
@@ -322,8 +308,7 @@ export class PlaygroundComponent {
       activityResetCooldownMs: this.activityCooldownSeconds * 1000,
       resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',
       resetOnWarningActivity: this.resetOnWarningActivity,
-      domActivityEvents,
-      syncMode: this.selectedSyncMode
+      domActivityEvents
     });
     const nextConfig = this.sessionTimeout.getConfig();
     this.syncLocalConfigInputs(nextConfig);
@@ -350,18 +335,6 @@ export class PlaygroundComponent {
       this.domEventSelection.delete(event);
     }
     this.applyConfig();
-  }
-
-  onSyncModeChange(mode: SessionSyncMode | string): void {
-    if (this.isObserverMode) {
-      return;
-    }
-    if (mode === 'leader' || mode === 'distributed') {
-      this.selectedSyncMode = mode;
-      this.persistSyncMode(mode);
-      this.applyConfig();
-      this.requestSharedStateSync('sync-mode-change');
-    }
   }
 
   requestSharedStateSync(reason?: string): void {
@@ -420,8 +393,6 @@ export class PlaygroundComponent {
     this.autoResume = config.resumeBehavior !== 'manual';
     this.resetOnWarningActivity = config.resetOnWarningActivity;
     this.domEventSelection = new Set<DomActivityEventName>(config.domActivityEvents);
-    this.selectedSyncMode = config.syncMode;
-    this.persistSyncMode(config.syncMode);
   }
 
   private currentDomActivityEvents(): DomActivityEventName[] {
@@ -694,33 +665,6 @@ export class PlaygroundComponent {
       summary,
       detail: detailEntries.length > 0 ? detailEntries.join(', ') : undefined
     };
-  }
-
-  private readStoredSyncMode(): SessionSyncMode | null {
-    try {
-      const globalRef = globalThis as unknown as { localStorage?: Storage };
-      const raw = globalRef?.localStorage?.getItem(this.syncModeStorageKey) ?? null;
-      if (raw === 'leader' || raw === 'distributed') {
-        return raw;
-      }
-    } catch {
-      // Storage access can fail in private browsing or server contexts.
-    }
-    return null;
-  }
-
-  private persistSyncMode(mode: SessionSyncMode): void {
-    try {
-      const globalRef = globalThis as unknown as { localStorage?: Storage };
-      globalRef?.localStorage?.setItem(this.syncModeStorageKey, mode);
-    } catch {
-      // Swallow storage errors; the playground still works without persistence.
-    }
-  }
-
-  syncModeLabel(mode: SessionSyncMode): string {
-    const option = this.syncModeOptions.find(item => item.value === mode);
-    return option?.label ?? mode;
   }
 
   private formatOperation(operation: SharedSessionState['metadata']['operation']): string {

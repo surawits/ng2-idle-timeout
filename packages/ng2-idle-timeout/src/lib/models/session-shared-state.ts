@@ -1,4 +1,3 @@
-import type { SessionSyncMode } from './session-timeout-config';
 import type { SessionState } from './session-state';
 
 export const SHARED_STATE_VERSION = 3;
@@ -33,7 +32,6 @@ export interface SharedConfigPayload {
   warnBeforeMs: number;
   activityResetCooldownMs: number;
   storageKeyPrefix: string;
-  syncMode: SessionSyncMode;
   resumeBehavior: 'manual' | 'autoOnServerSync' | undefined;
   resetOnWarningActivity: boolean;
   ignoreUserActivityWhenPaused: boolean;
@@ -55,7 +53,6 @@ export interface SharedSessionSnapshot {
 export interface SharedSessionState {
   version: typeof SHARED_STATE_VERSION;
   updatedAt: number;
-  syncMode: SessionSyncMode;
   leader: LeaderInfo | null;
   metadata: SharedStateMetadata;
   snapshot: SharedSessionSnapshot;

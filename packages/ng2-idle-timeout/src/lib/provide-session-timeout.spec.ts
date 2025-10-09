@@ -77,8 +77,7 @@ describe('createSessionTimeoutProviders', () => {
           storageKeyPrefix: 'spec-app',
           idleGraceMs: 1000,
           countdownMs: 15000,
-          warnBeforeMs: 5000,
-          syncMode: 'leader'
+          warnBeforeMs: 5000
         }),
         { provide: TimeSourceService, useClass: StubTimeSourceService },
         { provide: SharedStateCoordinatorService, useClass: StubSharedStateCoordinatorService }
@@ -107,8 +106,7 @@ describe('provideSessionTimeout in NgModule providers', () => {
           storageKeyPrefix: 'ngmodule-app',
           idleGraceMs: 2000,
           countdownMs: 42000,
-          warnBeforeMs: 7000,
-          syncMode: 'distributed'
+          warnBeforeMs: 7000
         })),
         { provide: TimeSourceService, useClass: StubTimeSourceService },
         { provide: SharedStateCoordinatorService, useClass: StubSharedStateCoordinatorService }
@@ -123,7 +121,6 @@ describe('provideSessionTimeout in NgModule providers', () => {
     expect(config.storageKeyPrefix).toBe('ngmodule-app');
     expect(config.countdownMs).toBe(42000);
     expect(config.idleGraceMs).toBe(2000);
-    expect(config.syncMode).toBe('distributed');
   });
 });
 
@@ -149,8 +146,7 @@ describe('APP_INITIALIZER ordering', () => {
           storageKeyPrefix: 'initializer-app',
           idleGraceMs: 3000,
           countdownMs: 18000,
-          warnBeforeMs: 6000,
-          syncMode: 'leader'
+          warnBeforeMs: 6000
         }),
         { provide: TimeSourceService, useClass: StubTimeSourceService },
         { provide: SharedStateCoordinatorService, useClass: StubSharedStateCoordinatorService }

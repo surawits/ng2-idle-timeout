@@ -2,8 +2,6 @@ import type { ActivityEvent } from './activity-event';
 
 export type SessionTimeoutStrategy = 'userOnly' | 'userAndHttpAllowlist' | 'aggressive';
 
-export type SessionSyncMode = 'leader' | 'distributed';
-
 export const DOM_ACTIVITY_EVENT_NAMES = [
   'mousemove',
   'mousedown',
@@ -51,7 +49,6 @@ export interface SessionTimeoutConfig {
   activityResetCooldownMs: number;
   storageKeyPrefix: string;
   appInstanceId?: string;
-  syncMode: SessionSyncMode;
   strategy: SessionTimeoutStrategy;
   httpActivity: HttpActivityPolicyConfig;
   actionDelays: SessionActionDelays;

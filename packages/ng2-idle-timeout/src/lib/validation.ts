@@ -2,7 +2,6 @@ import { DEFAULT_SESSION_TIMEOUT_CONFIG } from './defaults';
 import {
   DOM_ACTIVITY_EVENT_NAMES,
   type DomActivityEventName,
-  type SessionSyncMode,
   type SessionTimeoutConfig,
   type SessionTimeoutPartialConfig
 } from './models/session-timeout-config';
@@ -18,11 +17,10 @@ export interface ValidationResult {
 }
 
 const DOM_ACTIVITY_EVENT_SET = new Set<string>(DOM_ACTIVITY_EVENT_NAMES);
-const SYNC_MODE_SET = new Set<SessionSyncMode>(['leader', 'distributed']);
 
 export function validateConfig(partial: SessionTimeoutPartialConfig | undefined): ValidationResult {
   const issues: ValidationIssue[] = [];
-  const { config, invalidDomActivityEvents, invalidSyncMode } = normalizeConfig(partial);
+  const { config, invalidDomActivityEvents, removedSyncMode } = normalizeConfig(partial);
 
   if (config.idleGraceMs <= 0) {
     issues.push(createIssue('idleGraceMs', 'Value must be greater than 0'));
@@ -71,11 +69,11 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
     );
   }
 
-  if (invalidSyncMode) {
+  if (removedSyncMode !== undefined) {
     issues.push(
       createIssue(
         'syncMode',
-        `Unsupported syncMode: ${invalidSyncMode}. Allowed values: ${Array.from(SYNC_MODE_SET).join(', ')}`
+        `syncMode '${removedSyncMode}' is no longer supported; leader coordination is always enforced.`
       )
     );
   }
@@ -86,7 +84,7 @@ export function validateConfig(partial: SessionTimeoutPartialConfig | undefined)
 interface NormalizedConfigResult {
   config: SessionTimeoutConfig;
   invalidDomActivityEvents: string[];
-  invalidSyncMode: string | null;
+  removedSyncMode: string | undefined;
 }
 
 function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): NormalizedConfigResult {
@@ -94,7 +92,7 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Norm
     ...DEFAULT_SESSION_TIMEOUT_CONFIG,
     domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
   };
-  const { httpActivity, actionDelays, domActivityEvents, syncMode, ...shallow } = partial ?? {};
+  const { httpActivity, actionDelays, domActivityEvents, ...shallow } = partial ?? {};
 
   const merged: SessionTimeoutConfig = {
     ...base,
@@ -111,15 +109,11 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Norm
   };
 
   const invalidDomActivityEvents: string[] = [];
-  let invalidSyncMode: string | null = null;
+  let removedSyncMode: string | undefined;
 
-  if (syncMode === undefined) {
-    merged.syncMode = base.syncMode;
-  } else if (typeof syncMode === 'string' && SYNC_MODE_SET.has(syncMode as SessionSyncMode)) {
-    merged.syncMode = syncMode as SessionSyncMode;
-  } else {
-    invalidSyncMode = syncMode === null ? 'null' : String(syncMode);
-    merged.syncMode = base.syncMode;
+  if (partial && 'syncMode' in (partial as Record<string, unknown>)) {
+    const syncModeValue = (partial as Record<string, unknown>)['syncMode'];
+    removedSyncMode = syncModeValue === null ? 'null' : String(syncModeValue);
   }
 
   if (Array.isArray(domActivityEvents)) {
@@ -144,7 +138,7 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Norm
   merged.httpActivity.allowlist = [...(merged.httpActivity.allowlist ?? [])];
   merged.httpActivity.denylist = [...(merged.httpActivity.denylist ?? [])];
 
-  return { config: merged, invalidDomActivityEvents, invalidSyncMode };
+  return { config: merged, invalidDomActivityEvents, removedSyncMode };
 }
 
 function createIssue(field: string, message: string): ValidationIssue {

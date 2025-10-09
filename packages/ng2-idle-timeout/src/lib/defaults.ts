@@ -41,7 +41,6 @@ export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   activityResetCooldownMs: 0,
   storageKeyPrefix: 'ng2-idle-timeout',
   appInstanceId: undefined,
-  syncMode: 'leader',
   strategy: 'userOnly',
   httpActivity: {
     ...DEFAULT_HTTP_ACTIVITY,

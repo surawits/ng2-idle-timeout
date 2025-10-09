@@ -152,16 +152,15 @@
           <p>{{ preset.description }}</p>
         </div>
       </div>
-      <h3 class="section-heading">Sync modes</h3>
-      <p>Pick the coordination strategy that matches your application topology.</p>
+      <h3 class="section-heading">Shared state coordination</h3>
+      <p>Leader coordination is enforced in versions 0.3.4 and later. Distributed mode documentation is retained below for historical reference only.</p>
       <ul class="list-bullet">
         <li><code>leader</code> keeps a single writer that persists snapshots and rebroadcasts updates.</li>
-        <li><code>distributed</code> enables active-active writers with Lamport clocks so simultaneous updates reconcile deterministically.</li>
+        <li><em>Distributed mode was removed after field issues; legacy snapshots are still normalised for compatibility.</em></li>
       </ul>
-      <p class="helper">Align <code>syncMode</code> across tabs before starting the service. Mismatched modes trigger reconciliation loops and warning banners in the playground.</p>
 
       <h3 class="section-heading">Shared state metadata</h3>
-      <p>Distributed mode snapshots include metadata so peers can reason about ordering:</p>
+      <p>Snapshots include metadata so peers can reason about ordering, reconcile after crashes, and diagnose issues:</p>
       <ul class="list-bullet">
         <li><code>revision</code> and <code>logicalClock</code> track monotonic progress for each snapshot.</li>
         <li><code>writerId</code> identifies which tab created the update.</li>
@@ -291,9 +290,10 @@
 
       <h3 class="section-heading">Manual validation</h3>
       <p>
-        Walk through the distributed mode checklist in <code>docs/manual-validation/distributed-playground.md</code>
+        Review the archived distributed mode checklist in <code>docs/manual-validation/distributed-playground.md</code> if you need context on the removed feature
         before cutting a release.
       </p>
     </div>
   </article>
 </section>
+

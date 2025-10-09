@@ -1,7 +1,7 @@
 # Sprint Plan
 
 ## Goal
-- Implement cross-tab timer and configuration synchronization with selectable syncMode (default leader, alternative distributed) ensuring consistent state across tabs.
+- Implement cross-tab timer and configuration synchronization with leader coordination (distributed mode ultimately removed in CP9f) ensuring consistent state across tabs.
 
 ## Scope
 - Redesign shared state persistence and broadcast flow to support leader and distributed coordination modes.
@@ -48,6 +48,8 @@
     - [x] 9b Patch root injector config flow and add guardrails.
     - [x] 9c Fix warning reset regression after manual extend.
     - [x] 9d Verification, documentation sync, and planning updates.
+    - [x] 9e Restore idle timer on manual extend (`packages/ng2-idle-timeout/src/lib/services/session-timeout.service.ts` + specs).
+    - [x] 9f Remove distributed mode (service, coordinator, docs, playground).
 - [x] Checkpoint 10 – Playground Deployment Automation
   - Deliverables: GitHub Pages workflow building `apps/experience`, automated artifact upload, deployment documentation updates.
 ## Risks & Assumptions

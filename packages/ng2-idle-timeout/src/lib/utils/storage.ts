@@ -34,7 +34,6 @@ interface SerializedConfig {
   pollingMs: number;
   activityResetCooldownMs?: number;
   storageKeyPrefix: string;
-  syncMode?: SessionTimeoutConfig['syncMode'];
   strategy: SessionTimeoutConfig['strategy'];
   httpActivity: SerializedHttpConfig;
   actionDelays?: Partial<SessionActionDelays>;
@@ -171,7 +170,6 @@ function serializeConfig(config: SessionTimeoutConfig): SerializedConfig {
     pollingMs: config.pollingMs,
     activityResetCooldownMs: config.activityResetCooldownMs,
     storageKeyPrefix: config.storageKeyPrefix,
-    syncMode: config.syncMode,
     strategy: config.strategy,
     httpActivity: serializeHttpConfig(config.httpActivity),
     actionDelays: { ...config.actionDelays },
@@ -224,7 +222,6 @@ function deserializeConfig(serialized: SerializedConfig): SessionTimeoutConfig {
     activityResetCooldownMs: serialized.activityResetCooldownMs ?? DEFAULT_SESSION_TIMEOUT_CONFIG.activityResetCooldownMs,
     storageKeyPrefix: serialized.storageKeyPrefix,
     appInstanceId: undefined,
-    syncMode: serialized.syncMode ?? DEFAULT_SESSION_TIMEOUT_CONFIG.syncMode,
     strategy: serialized.strategy,
     httpActivity: deserializeHttpConfig(serialized.httpActivity),
     actionDelays: mergedDelays,

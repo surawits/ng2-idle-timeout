@@ -1,4 +1,5 @@
-# Distributed Playground Manual Validation
+# Distributed Playground Checklist
+> **Archived**: Distributed mode was removed in v0.3.4. This checklist is retained for historical reference only.
 
 Use this checklist to exercise the updated playground controls and confirm distributed sync behaviour before tagging a release.
 

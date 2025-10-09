@@ -1,9 +1,9 @@
 # Sprint 8 Notes
 
 ## Highlights
-- Introduced distributed sync mode with Lamport metadata and conflict resolution inside `SessionTimeoutService` and the shared-state coordinator.
-- Documented the new `syncMode` configuration, shared metadata fields, and manual validation workflow.
-- Experience playground docs explain distributed diagnostics and link to the migration guide.
+- Removed distributed sync mode after field issues; `SessionTimeoutService` now enforces leader-only coordination and ignores legacy `syncMode` values.
+- Updated documentation and playground experience to reflect leader-only coordination and simplified shared-state diagnostics.
+- Experience playground docs now reference leader-only workflows and document the archived distributed checklist for historical context.
 - Hardened server-time synchronisation so `SessionTimeoutService` no longer requires `HttpClient` unless `timeSource: 'server'`, resolving `sessionTimeoutProviders` bootstrap failures.
 - Added `createSessionTimeoutProviders` and `provideSessionTimeout` helpers (plus schematic updates) to keep configuration wiring consistent across standalone and NgModule apps.
 

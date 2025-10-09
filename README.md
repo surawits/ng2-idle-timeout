@@ -25,7 +25,7 @@
 
 - Consolidates idle detection, countdown warnings, and expiry flows across tabs and windows.
 - Survives reloads by persisting snapshots and configuration so state is restored instantly.
-- Coordinates leader and distributed writers with Lamport clocks for deterministic reconciliation.
+- Coordinates leader election across tabs and keeps shared state consistent without relying on Angular zones.
 - Remains zoneless-friendly; activity sources are built on Angular signals.
 
 **How it fits together**
@@ -90,7 +90,6 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
    export const sessionTimeoutProviders = createSessionTimeoutProviders(defaultSessionTimeoutConfig);
    ```
 
-> Switch to distributed coordination by setting `syncMode: 'distributed'` in the config. All tabs must opt in to keep consensus stable.
 
 3. **Register providers with your bootstrap**
 
@@ -218,7 +217,6 @@ Your application might be bootstrapped with the standalone APIs (`bootstrapAppli
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `syncMode` | `'leader'` | Primary coordination mode. `'leader'` keeps a single writer; `'distributed'` lets any tab publish updates with Lamport ordering. |
 | `idleGraceMs` | `120000` | Milliseconds the session may remain idle before countdown begins. |
 | `countdownMs` | `3600000` | Countdown window (in ms) for the user to extend or acknowledge before expiry. |
 | `warnBeforeMs` | `300000` | Threshold inside the countdown that emits a WARN event and typically opens UI prompts. |
@@ -254,7 +252,6 @@ Idle            Countdown            Warn              Expired
 - `'leader'`: default single-writer coordination. The elected tab owns persistence and rebroadcasts snapshots.
 - `'distributed'`: active-active coordination using Lamport clocks. Any tab may publish updates; conflicts resolve by logical clock then writer id.
 
-> Align `syncMode` across every tab before starting the service. Mismatches trigger reconciliation loops and warning banners in the playground.
 
 ### Shared state metadata
 
@@ -343,9 +340,8 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 ### Cross-tab and multi-device coordination
 
 - Share a `storageKeyPrefix` across tabs so extends and expiries propagate instantly.
-- Pick a `syncMode` that matches your topology. `'leader'` centralises writes; `'distributed'` lets any tab publish updates with Lamport ordering.
-- Subscribe to `LeaderElected` events in leader mode to gate background sync jobs to a single primary tab.
-- Use the playground distributed diagnostics to rehearse failover and reconciliation flows before release.
+- Subscribe to `LeaderElected` events to gate background sync jobs to a single primary tab.
+- Use the playground diagnostics to rehearse failover and reconciliation flows before release.
 
 ### HTTP and server alignment
 
@@ -364,8 +360,6 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 ## Additional Resources
 
 - **Docs & playground**: `npm run demo:start` (Angular 18 experience app at http://localhost:4200).
-- **Migration guides**: see `docs/migration/distributed-sync.md` for distributed mode adoption steps.
-- **Manual validation**: follow `docs/manual-validation/distributed-playground.md` to rehearse consensus scenarios.
 - **Release notes**: see `RELEASE_NOTES.md` for breaking changes and upgrade hints.
 - **Support & issues**: open tickets at https://github.com/ng2-idle-timeout.
 

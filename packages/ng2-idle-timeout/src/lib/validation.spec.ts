@@ -1,27 +1,16 @@
-import { DEFAULT_SESSION_TIMEOUT_CONFIG } from './defaults';
 import { validateConfig } from './validation';
 
-describe('validateConfig syncMode support', () => {
-  it('defaults syncMode to leader when omitted', () => {
+describe('validateConfig legacy syncMode handling', () => {
+  it('ignores legacy syncMode entries and surfaces a validation issue', () => {
+    const result = validateConfig({ syncMode: 'distributed' } as unknown as Record<string, unknown>);
+
+    expect(result.issues.find(issue => issue.field === 'syncMode')).toBeDefined();
+    expect((result.config as Record<string, unknown>).syncMode).toBeUndefined();
+  });
+
+  it('does not report an issue when syncMode is omitted', () => {
     const result = validateConfig(undefined);
 
-    expect(result.config.syncMode).toBe('leader');
     expect(result.issues.find(issue => issue.field === 'syncMode')).toBeUndefined();
-  });
-
-  it('accepts distributed syncMode and preserves value', () => {
-    const result = validateConfig({ syncMode: 'distributed' });
-
-    expect(result.config.syncMode).toBe('distributed');
-    expect(result.issues.find(issue => issue.field === 'syncMode')).toBeUndefined();
-  });
-
-  it('flags invalid syncMode values and falls back to default', () => {
-    const result = validateConfig({ syncMode: 'invalid-mode' as never });
-
-    const syncModeIssue = result.issues.find(issue => issue.field === 'syncMode');
-    expect(syncModeIssue).toBeDefined();
-    expect(syncModeIssue?.message).toContain('invalid-mode');
-    expect(result.config.syncMode).toBe(DEFAULT_SESSION_TIMEOUT_CONFIG.syncMode);
   });
 });

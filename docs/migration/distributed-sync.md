@@ -1,27 +1,21 @@
-# Distributed Sync Migration
+# Distributed Sync (Removed)
 
-This guide covers the changes introduced with the distributed coordination release (shared state schema v3).
-Use it when upgrading from 0.2.x or earlier.
+> Update 2025-10-09: Distributed coordination has been removed from 
+g2-idle-timeout after repeated field issues. The library now enforces leader-only coordination for cross-tab state updates.
 
-## Key changes
-- New `syncMode` configuration option chooses between single-writer (*leader*) and Lamport-based multi-writer (*distributed*).
-- Shared snapshots now embed `revision`, `logicalClock`, `writerId`, `operation`, and `causalityToken` so tabs can reconcile conflicts deterministically.
-- Snapshot operations are tagged (manual extend, auto extend, activity reset, pause/resume, config change, expire) to keep telemetry and audit trails accurate.
-- Persisted state written before v3 is upgraded on load, but stale Lamport clocks can linger until tabs rebroadcast.
+## What changed
+- syncMode is no longer part of SessionTimeoutConfig. Supplying it via providers or setConfig() is ignored and surfaces a validation warning.
+- SessionTimeoutService treats any persisted distributed snapshots as legacy data and keeps only the latest leader snapshot.
+- Playground diagnostics no longer expose a mode toggle; shared state metadata remains available for visibility troubleshooting.
 
-## Upgrade checklist
-1. **Update dependencies** – bump `ng2-idle-timeout` to `>=0.3.0` and rebuild the workspace.
-2. **Align configuration** – ensure every bootstrap path sets the same `SESSION_TIMEOUT_CONFIG`. When enabling distributed mode, add `syncMode: 'distributed'` to your provider or call `sessionTimeoutService.setConfig({ syncMode: 'distributed' })` before `start()`.
-3. **Clear or reconcile storage** – either flush the previous `storageKeyPrefix` namespace (localStorage + BroadcastChannel) during deployment or allow the upgraded coordinator to rebroadcast a fresh snapshot from one tab.
-4. **Review hooks and analytics** – if you log activity based on `SessionEvent` payloads, capture the new `metadata.operation` values so dashboards distinguish auto extends from manual interventions.
-5. **Document operational runbooks** – update runbooks to mention the playground diagnostics card and the manual validation script under `docs/manual-validation/distributed-playground.md`.
+## Action items
+1. Remove syncMode entries from your configuration and providers.
+2. Delete any automation or documentation that references distributed mode, Lamport clocks, or consensus rules.
+3. Ensure deployment notes no longer instruct teams to switch coordination modes across environments.
 
-## Verification
-- `npm run test --workspace=ng2-idle-timeout`
-- `npm run demo:test`
-- Follow the distributed playground checklist with at least two tabs to validate handshake, conflict resolution, and persisted wake flows.
+## Legacy reference
+If you still need to inspect the deprecated behaviour (for example, to reason about old telemetry or persisted data), refer to commit history prior to 0.3.4. Archived resources:
+- docs/manual-validation/distributed-playground.md
+- Sprint 8 planning notes under docs/planning/
 
-## Troubleshooting tips
-- If tabs disagree about `syncMode`, the playground now surfaces a warning banner; align configuration and reload once both tabs match.
-- Replaying old persisted snapshots with missing metadata forces the coordinator to normalise and emit a `bootstrap` operation; monitor logs to confirm before removing maintenance modes.
-- When experimenting locally, use the **Clear persisted state** button in the playground to reset Lamport clocks without wiping the entire origin storage.
+These documents are retained for historical context only.

@@ -201,11 +201,7 @@ export class SessionTimeoutService {
     this.serverTime?.configure(config);
     if (this.leaderElection) {
       this.leaderElection.updateConfig(config);
-      if (config.syncMode === 'leader') {
-        this.leaderElection.electLeader();
-      } else {
-        this.leaderElection.stepDown();
-      }
+      this.leaderElection.electLeader();
     }
     this.sharedStateCoordinator.updateConfig(config);
     this.syncLeaderState();
@@ -395,17 +391,34 @@ export class SessionTimeoutService {
 
   extend(meta?: Record<string, unknown>): void {
     this.executeWithDelay('extend', () => {
-      if (this.snapshotSignal().state === 'EXPIRED') {
+      const snapshot = this.snapshotSignal();
+      if (snapshot.state === 'EXPIRED') {
         return;
       }
+
       const timestamp = this.timeSource.now();
-      const countdownEndAt = timestamp + this.configSignal().countdownMs;
-      this.updateSnapshot({
-        state: 'COUNTDOWN',
-        countdownEndAt,
-        remainingMs: Math.max(0, countdownEndAt - timestamp),
-        paused: false
-      }, 'manual-extend');
+      const config = this.configSignal();
+      const countdownEndAt = timestamp + config.countdownMs;
+      const partial: Partial<SessionSnapshot> =
+        snapshot.state === 'IDLE'
+          ? {
+              state: 'IDLE',
+              idleStartAt: timestamp,
+              lastActivityAt: timestamp,
+              countdownEndAt: null,
+              remainingMs: config.countdownMs,
+              paused: false
+            }
+          : {
+              state: 'COUNTDOWN',
+              idleStartAt: timestamp,
+              lastActivityAt: timestamp,
+              countdownEndAt,
+              remainingMs: Math.max(0, countdownEndAt - timestamp),
+              paused: false
+            };
+
+      this.updateSnapshot(partial, 'manual-extend');
       this.emitEvent('Extended', meta);
       this.broadcastCrossTab('extend', { snapshot: { ...this.snapshotSignal() } });
     });
@@ -805,13 +818,28 @@ export class SessionTimeoutService {
       }, 'manual-extend');
     } else {
       const timestamp = this.timeSource.now();
-      const countdownEndAt = timestamp + this.configSignal().countdownMs;
-      this.updateSnapshot({
-        state: 'COUNTDOWN',
-        countdownEndAt,
-        remainingMs: Math.max(0, countdownEndAt - timestamp),
-        paused: false
-      }, 'manual-extend');
+      const config = this.configSignal();
+      const currentSnapshot = this.snapshotSignal();
+      if (currentSnapshot.state === 'IDLE') {
+        this.updateSnapshot({
+          state: 'IDLE',
+          idleStartAt: timestamp,
+          lastActivityAt: timestamp,
+          countdownEndAt: null,
+          remainingMs: config.countdownMs,
+          paused: false
+        }, 'manual-extend');
+      } else {
+        const countdownEndAt = timestamp + config.countdownMs;
+        this.updateSnapshot({
+          state: 'COUNTDOWN',
+          idleStartAt: timestamp,
+          lastActivityAt: timestamp,
+          countdownEndAt,
+          remainingMs: Math.max(0, countdownEndAt - timestamp),
+          paused: false
+        }, 'manual-extend');
+      }
     }
 
     this.emitEvent('Extended', { crossTab: true, sourceTabId: message.sourceId });
@@ -896,20 +924,6 @@ export class SessionTimeoutService {
       this.leaderEpoch = remoteEpoch;
     }
 
-    const localConfig = this.configSignal();
-    const distributedActive = sharedState.syncMode === 'distributed' && localConfig.syncMode === 'distributed';
-
-    if (distributedActive) {
-      const comparison = this.compareDistributedState(sharedState);
-      this.lamportClock = Math.max(this.lamportClock, sharedState.metadata.logicalClock);
-      this.configLamportClock = Math.max(this.configLamportClock, sharedState.config.logicalClock);
-      this.sharedConfigRevision = Math.max(this.sharedConfigRevision, sharedState.config.revision);
-
-      if (comparison <= 0) {
-        return;
-      }
-    }
-
     this.updateTrackingFromState(sharedState);
 
     this.isApplyingSharedState = true;
@@ -920,7 +934,6 @@ export class SessionTimeoutService {
         warnBeforeMs: sharedState.config.warnBeforeMs,
         activityResetCooldownMs: sharedState.config.activityResetCooldownMs,
         storageKeyPrefix: sharedState.config.storageKeyPrefix,
-        syncMode: sharedState.config.syncMode,
         resumeBehavior: sharedState.config.resumeBehavior,
         resetOnWarningActivity: sharedState.config.resetOnWarningActivity,
         ignoreUserActivityWhenPaused: sharedState.config.ignoreUserActivityWhenPaused,
@@ -995,17 +1008,15 @@ export class SessionTimeoutService {
     const snapshot = this.snapshotSignal();
     const now = this.timeSource.now();
     const leaderId = this.leaderElection?.leaderId?.();
-    const leaderInfo =
-      config.syncMode === 'leader' && leaderId
-        ? { id: leaderId, heartbeatAt: now, epoch: this.leaderEpoch }
-        : null;
+    const leaderInfo = leaderId
+      ? { id: leaderId, heartbeatAt: now, epoch: this.leaderEpoch }
+      : null;
 
     const configLogicalClock = this.configLamportClock > 0 ? this.configLamportClock : metadata.logicalClock;
 
     return {
       version: SHARED_STATE_VERSION,
       updatedAt: now,
-      syncMode: config.syncMode,
       leader: leaderInfo,
       metadata,
       snapshot: {
@@ -1022,7 +1033,6 @@ export class SessionTimeoutService {
         warnBeforeMs: config.warnBeforeMs,
         activityResetCooldownMs: config.activityResetCooldownMs,
         storageKeyPrefix: config.storageKeyPrefix,
-        syncMode: config.syncMode,
         resumeBehavior: config.resumeBehavior,
         resetOnWarningActivity: config.resetOnWarningActivity,
         ignoreUserActivityWhenPaused: config.ignoreUserActivityWhenPaused,
@@ -1041,8 +1051,7 @@ export class SessionTimeoutService {
     if (this.isApplyingSharedState) {
       return;
     }
-    const config = this.configSignal();
-    if (config.syncMode === 'leader' && this.leaderElection?.isLeader() === false) {
+    if (this.leaderElection?.isLeader() === false) {
       return;
     }
 
@@ -1210,31 +1219,6 @@ export class SessionTimeoutService {
     );
   }
 
-  private compareDistributedState(remote: SharedSessionState): number {
-    const localRevision = this.sharedStateRevision;
-    const remoteRevision = remote.metadata.revision;
-
-    if (remoteRevision > localRevision) {
-      return 1;
-    }
-    if (remoteRevision < localRevision) {
-      return -1;
-    }
-
-    const localClock = this.latestSharedState?.metadata.logicalClock ?? this.lamportClock;
-    const remoteClock = remote.metadata.logicalClock;
-
-    if (remoteClock > localClock) {
-      return 1;
-    }
-    if (remoteClock < localClock) {
-      return -1;
-    }
-
-    const localWriter = this.latestSharedState?.metadata.writerId ?? this.writerId;
-    return remote.metadata.writerId.localeCompare(localWriter);
-  }
-
   private updateTrackingFromState(sharedState: SharedSessionState): void {
     this.latestSharedState = sharedState;
     this.sharedStateRevision = sharedState.metadata.revision;
@@ -1245,8 +1229,7 @@ export class SessionTimeoutService {
   }
 
   private handleSyncRequest(): void {
-    const config = this.configSignal();
-    if (config.syncMode === 'leader' && this.leaderElection?.isLeader() === false) {
+    if (this.leaderElection?.isLeader() === false) {
       return;
     }
     const reuseLatest = this.latestSharedState != null;
@@ -1413,7 +1396,6 @@ export class SessionTimeoutService {
     if (!this.leaderElection) {
       return;
     }
-    const config = this.configSignal();
     const isLeader = this.leaderElection.isLeader();
     const leaderId = this.leaderElection.leaderId();
     const previousRole = this.leaderState;
@@ -1423,13 +1405,11 @@ export class SessionTimeoutService {
     this.lastKnownLeaderId = leaderId ?? null;
 
     if (previousRole === null) {
-      if (config.syncMode === 'leader') {
-        if (isLeader) {
-          this.bumpLeaderEpoch();
-          this.broadcastSharedState('bootstrap');
-        } else if (!leaderId) {
-          this.requestLeaderSync('leader-missing', { force: true });
-        }
+      if (isLeader) {
+        this.bumpLeaderEpoch();
+        this.broadcastSharedState('bootstrap');
+      } else if (!leaderId) {
+        this.requestLeaderSync('leader-missing', { force: true });
       }
       return;
     }
@@ -1438,22 +1418,16 @@ export class SessionTimeoutService {
       if (isLeader) {
         this.bumpLeaderEpoch();
         this.emitEvent('LeaderElected', { leaderId });
-        if (config.syncMode === 'leader') {
-          this.broadcastSharedState('bootstrap');
-        }
+        this.broadcastSharedState('bootstrap');
       } else {
         this.emitEvent('LeaderLost', { leaderId });
-        if (config.syncMode === 'leader') {
-          this.requestLeaderSync('leader-changed', { force: true });
-        }
+        this.requestLeaderSync('leader-changed', { force: true });
       }
       return;
     }
 
-    if (!isLeader && config.syncMode === 'leader') {
-      if (previousLeaderId !== this.lastKnownLeaderId) {
-        this.requestLeaderSync('leader-updated', { force: true });
-      }
+    if (!isLeader && previousLeaderId !== this.lastKnownLeaderId) {
+      this.requestLeaderSync('leader-updated', { force: true });
     }
   }
 
@@ -1464,9 +1438,6 @@ export class SessionTimeoutService {
   }
 
   private requestLeaderSync(reason: string, options?: { force?: boolean }): void {
-    if (this.configSignal().syncMode !== 'leader') {
-      return;
-    }
     const now = this.timeSource.now();
     if (!options?.force && this.lastSyncRequestAt != null && now - this.lastSyncRequestAt < HEARTBEAT_INTERVAL_MS) {
       return;
@@ -1480,12 +1451,11 @@ export class SessionTimeoutService {
     if (this.leaderElection) {
       this.leaderElection.electLeader();
     }
-    const config = this.configSignal();
     const now = this.timeSource.now();
     const hiddenDuration = this.lastHiddenAt != null ? now - this.lastHiddenAt : 0;
     this.lastHiddenAt = null;
 
-    if (!this.leaderElection || config.syncMode !== 'leader') {
+    if (!this.leaderElection) {
       return;
     }
 
@@ -1526,7 +1496,7 @@ export class SessionTimeoutService {
 
     this.refreshDerivedDurations();
 
-    if (this.areSnapshotsEqual(previous, next)) {
+    if (operation !== 'manual-extend' && this.areSnapshotsEqual(previous, next)) {
       return;
     }
 
@@ -1590,7 +1560,6 @@ export class SessionTimeoutService {
       previous.warnBeforeMs !== next.warnBeforeMs ||
       previous.activityResetCooldownMs !== next.activityResetCooldownMs ||
       previous.storageKeyPrefix !== next.storageKeyPrefix ||
-      previous.syncMode !== next.syncMode ||
       previous.resumeBehavior !== next.resumeBehavior ||
       previous.resetOnWarningActivity !== next.resetOnWarningActivity ||
       previous.ignoreUserActivityWhenPaused !== next.ignoreUserActivityWhenPaused ||
@@ -1603,9 +1572,6 @@ export class SessionTimeoutService {
     next: SessionTimeoutConfig
   ): SharedStateOperation {
     if (previous.storageKeyPrefix !== next.storageKeyPrefix) {
-      return 'bootstrap';
-    }
-    if (previous.syncMode !== next.syncMode) {
       return 'bootstrap';
     }
     return 'config-change';

@@ -79,8 +79,7 @@ describe('SharedStateCoordinatorService', () => {
   const baseConfig: SessionTimeoutConfig = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG,
     storageKeyPrefix: 'shared-test',
-    appInstanceId: 'testApp',
-    syncMode: 'leader'
+    appInstanceId: 'testApp'
   };
 
   beforeEach(() => {
@@ -143,7 +142,6 @@ describe('SharedStateCoordinatorService', () => {
       activityResetCooldownMs:
         overrides?.config?.activityResetCooldownMs ?? baseConfig.activityResetCooldownMs,
       storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
-      syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
       resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
       resetOnWarningActivity:
         overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
@@ -159,7 +157,6 @@ describe('SharedStateCoordinatorService', () => {
     return {
       version: SHARED_STATE_VERSION,
       updatedAt: overrides?.updatedAt ?? now,
-      syncMode: overrides?.syncMode ?? 'leader',
       leader: overrides?.leader ?? null,
       metadata,
       snapshot,
@@ -181,7 +178,7 @@ describe('SharedStateCoordinatorService', () => {
     expect(channel?.messages).toHaveLength(1);
     const message = channel?.messages[0] as { type: string; state: SharedSessionState };
     expect(message.type).toBe('state');
-    expect(message.state.syncMode).toBe('leader');
+    expect(message.state.metadata.writerId).toBe(sharedState.metadata.writerId);
   });
 
   it('emits updates and persists state when receiving remote broadcast', async () => {
@@ -238,7 +235,6 @@ describe('SharedStateCoordinatorService', () => {
     const legacy = {
       version: 2,
       updatedAt: 4200,
-      syncMode: 'distributed',
       leader: null,
       snapshot: {
         state: 'COUNTDOWN',
@@ -254,7 +250,6 @@ describe('SharedStateCoordinatorService', () => {
         warnBeforeMs: baseConfig.warnBeforeMs,
         activityResetCooldownMs: baseConfig.activityResetCooldownMs,
         storageKeyPrefix: baseConfig.storageKeyPrefix,
-        syncMode: 'distributed',
         resumeBehavior: baseConfig.resumeBehavior,
         ignoreUserActivityWhenPaused: baseConfig.ignoreUserActivityWhenPaused,
         allowManualExtendWhenExpired: baseConfig.allowManualExtendWhenExpired
@@ -270,7 +265,7 @@ describe('SharedStateCoordinatorService', () => {
     }
 
     expect(normalized.version).toBe(SHARED_STATE_VERSION);
-    expect(normalized.syncMode).toBe('distributed');
+    expect((normalized as unknown as Record<string, unknown>).syncMode).toBeUndefined();
     expect(normalized.metadata.operation).toBe('bootstrap');
     expect(normalized.metadata.revision).toBe(1);
     expect(normalized.metadata.writerId).toBe(service.getSourceId());

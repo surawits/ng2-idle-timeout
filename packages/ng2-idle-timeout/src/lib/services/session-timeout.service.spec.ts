@@ -190,7 +190,6 @@ describe('SessionTimeoutService', () => {
     activityResetCooldownMs: 0,
     storageKeyPrefix: 'test',
     appInstanceId: 'testApp',
-    syncMode: 'leader',
     strategy: 'userOnly',
     httpActivity: {
       enabled: false,
@@ -354,7 +353,6 @@ describe('SessionTimeoutService', () => {
       activityResetCooldownMs:
         overrides?.config?.activityResetCooldownMs ?? baseConfig.activityResetCooldownMs,
       storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
-      syncMode: overrides?.config?.syncMode ?? overrides?.syncMode ?? baseConfig.syncMode,
       resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
       resetOnWarningActivity:
         overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
@@ -370,7 +368,6 @@ describe('SessionTimeoutService', () => {
     return {
       version: SHARED_STATE_VERSION,
       updatedAt: overrides?.updatedAt ?? now,
-      syncMode: overrides?.syncMode ?? 'leader',
       leader: overrides?.leader ?? null,
       metadata,
       snapshot,
@@ -447,6 +444,51 @@ describe('SessionTimeoutService', () => {
     service.extend();
     const afterExtend = snapshot().remainingMs;
     expect(afterExtend).toBeGreaterThan(beforeExtend);
+  });
+
+  it('extend resets idle timer when invoked during idle phase', () => {
+    service.start();
+    expect(snapshot().state).toBe('IDLE');
+
+    time.advance(75);
+    manualTick();
+    expect(snapshot().state).toBe('IDLE');
+    const idleBeforeExtend = snapshot().idleStartAt;
+
+    const extendTimestamp = time.now();
+    service.extend();
+    const afterExtend = snapshot();
+
+    expect(afterExtend.state).toBe('IDLE');
+    expect(afterExtend.countdownEndAt).toBeNull();
+    expect(afterExtend.remainingMs).toBe(baseConfig.countdownMs);
+    expect(afterExtend.idleStartAt).toBe(extendTimestamp);
+    expect(afterExtend.lastActivityAt).toBe(extendTimestamp);
+    expect(afterExtend.idleStartAt).not.toBe(idleBeforeExtend);
+  });
+
+  it('extend updates idle anchor while refreshing countdown during countdown phase', () => {
+    service.start();
+    advanceAndTick(baseConfig.idleGraceMs + 1);
+    expect(snapshot().state).toBe('COUNTDOWN');
+
+    time.advance(125);
+    manualTick();
+    const idleBeforeExtend = snapshot().idleStartAt;
+    const previousCountdownEndAt = snapshot().countdownEndAt;
+    const extendTimestamp = time.now();
+
+    service.extend();
+    const afterExtend = snapshot();
+
+    expect(afterExtend.state).toBe('COUNTDOWN');
+    expect(afterExtend.remainingMs).toBe(baseConfig.countdownMs);
+    expect(previousCountdownEndAt).not.toBeNull();
+    expect(afterExtend.countdownEndAt).not.toBeNull();
+    expect(afterExtend.countdownEndAt as number).toBeGreaterThan(previousCountdownEndAt as number);
+    expect(afterExtend.idleStartAt).toBe(extendTimestamp);
+    expect(afterExtend.lastActivityAt).toBe(extendTimestamp);
+    expect(afterExtend.idleStartAt).not.toBe(idleBeforeExtend);
   });
 
   it('only broadcasts auto-extend when the countdown anchor changes', () => {
@@ -755,17 +797,6 @@ describe('SessionTimeoutService', () => {
     expect(operations).toContain('config-change');
   });
 
-  it('uses bootstrap metadata when sync mode changes', () => {
-    publishStateMock.mockClear();
-
-    service.setConfig({ syncMode: 'distributed' });
-
-    const operations = publishStateMock.mock.calls.map(call => {
-      const state = call[0] as SharedSessionState;
-      return state.metadata.operation;
-    });
-    expect(operations).toContain('bootstrap');
-  });
 
   it('does not broadcast shared state for config changes that only affect local behavior', () => {
     publishStateMock.mockClear();
@@ -775,313 +806,6 @@ describe('SessionTimeoutService', () => {
     expect(publishStateMock).not.toHaveBeenCalled();
   });
 
-  describe('distributed arbitration', () => {
-    beforeEach(() => {
-      service.setConfig({ syncMode: 'distributed' });
-      publishStateMock.mockClear();
-    });
-
-    it('ignores distributed revisions that lose arbitration', () => {
-      const internal = service as unknown as {
-        applySharedSessionState(state: SharedSessionState): void;
-        latestSharedState: SharedSessionState | null;
-        lamportClock: number;
-        configLamportClock: number;
-        sharedConfigRevision: number;
-      };
-
-      const winningState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 3,
-          logicalClock: 20,
-          writerId: 'remote-winning',
-          operation: 'manual-extend'
-        },
-        snapshot: {
-          state: 'COUNTDOWN',
-          remainingMs: 900,
-          idleStartAt: 50,
-          countdownEndAt: 950,
-          lastActivityAt: 25,
-          paused: false
-        },
-        config: {
-          revision: 2,
-          logicalClock: 20,
-          writerId: 'remote-winning',
-          syncMode: 'distributed'
-        }
-      });
-
-      internal.applySharedSessionState(winningState);
-
-      expect(internal.latestSharedState?.metadata.revision).toBe(3);
-      expect(internal.lamportClock).toBe(20);
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      publishStateMock.mockClear();
-
-      const staleState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 2,
-          logicalClock: 25,
-          writerId: 'remote-stale',
-          operation: 'reset-by-activity'
-        },
-        snapshot: {
-          state: 'IDLE',
-          remainingMs: baseConfig.countdownMs,
-          idleStartAt: 100,
-          countdownEndAt: null,
-          lastActivityAt: 100,
-          paused: false
-        },
-        config: {
-          revision: 1,
-          logicalClock: 25,
-          writerId: 'remote-stale',
-          syncMode: 'distributed'
-        }
-      });
-
-      internal.applySharedSessionState(staleState);
-
-      expect(internal.latestSharedState?.metadata.writerId).toBe('remote-winning');
-      expect(internal.latestSharedState?.metadata.revision).toBe(3);
-      expect(publishStateMock).not.toHaveBeenCalled();
-      expect(internal.lamportClock).toBe(25);
-      expect(internal.configLamportClock).toBeGreaterThanOrEqual(staleState.config.logicalClock);
-      expect(internal.sharedConfigRevision).toBeGreaterThanOrEqual(winningState.config.revision);
-    });
-
-    it('adopts distributed revisions that win arbitration and persists without rebroadcast', () => {
-      const internal = service as unknown as {
-        applySharedSessionState(state: SharedSessionState): void;
-        latestSharedState: SharedSessionState | null;
-        lamportClock: number;
-      };
-
-      const remoteState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 10,
-          logicalClock: 40,
-          writerId: 'remote-coord',
-          operation: 'pause'
-        },
-        snapshot: {
-          state: 'COUNTDOWN',
-          remainingMs: 450,
-          idleStartAt: 10,
-          countdownEndAt: 460,
-          lastActivityAt: 5,
-          paused: true
-        },
-        config: {
-          revision: 4,
-          logicalClock: 40,
-          writerId: 'remote-coord',
-          syncMode: 'distributed',
-          allowManualExtendWhenExpired: true
-        }
-      });
-
-      publishStateMock.mockClear();
-
-      internal.applySharedSessionState(remoteState);
-
-      expect(snapshot().paused).toBe(true);
-      expect(snapshot().remainingMs).toBe(450);
-      expect(internal.latestSharedState?.metadata).toMatchObject({
-        revision: 10,
-        writerId: 'remote-coord',
-        operation: 'pause'
-      });
-      expect(internal.lamportClock).toBe(40);
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      const [persisted, options] = publishStateMock.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-      expect(persisted).toBe(remoteState);
-      expect(options).toMatchObject({ persist: true, broadcast: false });
-    });
-
-    it('produces monotonic metadata for local distributed mutations', () => {
-      service.start();
-      publishStateMock.mockClear();
-
-      service.extend();
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      const [extendState] = publishStateMock.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-      const extendRevision = extendState.metadata.revision;
-      const extendClock = extendState.metadata.logicalClock;
-      expect(extendState.metadata.operation).toBe('manual-extend');
-      expect(extendState.metadata.writerId).toBe('coordinator-stub');
-      expect(extendState.metadata.causalityToken).toBe(`${extendState.metadata.writerId}:${extendClock}`);
-
-      publishStateMock.mockClear();
-      service.pause();
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      const [pauseState] = publishStateMock.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-      expect(pauseState.metadata.operation).toBe('pause');
-      expect(pauseState.metadata.revision).toBeGreaterThan(extendRevision);
-      expect(pauseState.metadata.logicalClock).toBeGreaterThan(extendClock);
-    });
-
-    it('prefers remote expire when revision outranks local manual extend', () => {
-      service.setConfig({ syncMode: 'distributed' });
-      service.start();
-      publishStateMock.mockClear();
-      service.extend();
-      const internal = service as unknown as {
-        applySharedSessionState(state: SharedSessionState): void;
-        latestSharedState: SharedSessionState | null;
-        lamportClock: number;
-      };
-
-      const baseSnapshot = snapshot();
-      const expireState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: (internal.latestSharedState?.metadata.revision ?? 0) + 5,
-          logicalClock: (internal.lamportClock ?? 0) + 50,
-          writerId: 'remote-expire',
-          operation: 'expire'
-        },
-        snapshot: {
-          state: 'EXPIRED',
-          remainingMs: 0,
-          idleStartAt: baseSnapshot.idleStartAt,
-          countdownEndAt: time.now() + 1000,
-          lastActivityAt: baseSnapshot.lastActivityAt,
-          paused: false
-        },
-        config: {
-          revision: (internal.latestSharedState?.config.revision ?? 0) + 1,
-          logicalClock: (internal.lamportClock ?? 0) + 50,
-          writerId: 'remote-expire',
-          syncMode: 'distributed'
-        }
-      });
-
-      publishStateMock.mockClear();
-      internal.applySharedSessionState(expireState);
-
-      expect(snapshot().state).toBe('EXPIRED');
-      expect(snapshot().remainingMs).toBe(0);
-      expect(internal.latestSharedState?.metadata.writerId).toBe('remote-expire');
-      expect(internal.lamportClock).toBe(expireState.metadata.logicalClock);
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      const [persisted, options] = publishStateMock.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-      expect(persisted).toBe(expireState);
-      expect(options).toMatchObject({ persist: true, broadcast: false });
-    });
-
-    it('breaks distributed ties using writer precedence', () => {
-      service.setConfig({ syncMode: 'distributed' });
-      const internal = service as unknown as {
-        applySharedSessionState(state: SharedSessionState): void;
-        latestSharedState: SharedSessionState | null;
-      };
-
-      const baseState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 12,
-          logicalClock: 90,
-          writerId: 'remote-alpha',
-          operation: 'manual-extend'
-        }
-      });
-
-      internal.applySharedSessionState(baseState);
-      publishStateMock.mockClear();
-
-      const tieState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 12,
-          logicalClock: 90,
-          writerId: 'remote-zulu',
-          operation: 'manual-extend'
-        },
-        snapshot: {
-          state: 'COUNTDOWN',
-          remainingMs: baseState.snapshot.remainingMs,
-          idleStartAt: baseState.snapshot.idleStartAt,
-          countdownEndAt: baseState.snapshot.countdownEndAt,
-          lastActivityAt: baseState.snapshot.lastActivityAt,
-          paused: false
-        }
-      });
-
-      internal.applySharedSessionState(tieState);
-
-      expect(internal.latestSharedState?.metadata.writerId).toBe('remote-zulu');
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      const [persisted, options] = publishStateMock.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-      expect(persisted).toBe(tieState);
-      expect(options).toMatchObject({ persist: true, broadcast: false });
-    });
-
-    it('resumes locally when distributed peer clears pause flag', () => {
-      service.setConfig({ syncMode: 'distributed' });
-      const internal = service as unknown as {
-        applySharedSessionState(state: SharedSessionState): void;
-        lamportClock: number;
-      };
-
-      const pausedState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 30,
-          logicalClock: 120,
-          writerId: 'remote-peer',
-          operation: 'pause'
-        },
-        snapshot: {
-          state: 'COUNTDOWN',
-          remainingMs: 600,
-          idleStartAt: 400,
-          countdownEndAt: 1000,
-          lastActivityAt: 400,
-          paused: true
-        }
-      });
-
-      internal.applySharedSessionState(pausedState);
-      expect(snapshot().paused).toBe(true);
-
-      const resumeState = buildSharedState({
-        syncMode: 'distributed',
-        metadata: {
-          revision: 31,
-          logicalClock: 121,
-          writerId: 'remote-peer',
-          operation: 'resume'
-        },
-        snapshot: {
-          state: 'COUNTDOWN',
-          remainingMs: 580,
-          idleStartAt: 420,
-          countdownEndAt: 1000,
-          lastActivityAt: 420,
-          paused: false
-        }
-      });
-
-      publishStateMock.mockClear();
-      internal.applySharedSessionState(resumeState);
-
-      expect(snapshot().paused).toBe(false);
-      expect(snapshot().remainingMs).toBe(580);
-      expect(internal.lamportClock).toBe(resumeState.metadata.logicalClock);
-      expect(publishStateMock).toHaveBeenCalledTimes(1);
-      const [persisted, options] = publishStateMock.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-      expect(persisted).toBe(resumeState);
-      expect(options).toMatchObject({ persist: true, broadcast: false });
-    });
-
-  });
 
   it('keeps remaining time observables in sync with signals', fakeAsync(() => {
     service.setConfig({ activityResetCooldownMs: 1000 });
@@ -1258,75 +982,6 @@ describe('SessionTimeoutService', () => {
     }
   });
 
-  it('restores distributed shared state from persisted storage', () => {
-    const distributedState = buildSharedState({
-      syncMode: 'distributed',
-      metadata: {
-        revision: 7,
-        logicalClock: 75,
-        writerId: 'remote-persist',
-        operation: 'manual-extend'
-      },
-      snapshot: {
-        state: 'COUNTDOWN',
-        remainingMs: 720,
-        idleStartAt: 120,
-        countdownEndAt: 840,
-        lastActivityAt: 120,
-        paused: false
-      },
-      config: {
-        revision: 3,
-        logicalClock: 75,
-        writerId: 'remote-persist',
-        syncMode: 'distributed',
-        allowManualExtendWhenExpired: true
-      }
-    });
-
-    TestBed.resetTestingModule();
-
-    const newDomService = new StubActivityDomService();
-    const newRouterService = new StubActivityRouterService();
-    const newServerTime = new StubServerTimeService();
-
-    TestBed.configureTestingModule({
-      providers: [
-        SessionTimeoutService,
-        { provide: TimeSourceService, useClass: MockTimeSourceService },
-        { provide: SESSION_TIMEOUT_CONFIG, useValue: { ...baseConfig, syncMode: 'distributed' } },
-        { provide: ActivityDomService, useValue: newDomService },
-        { provide: ActivityRouterService, useValue: newRouterService },
-        { provide: ServerTimeService, useValue: newServerTime },
-        { provide: SharedStateCoordinatorService, useClass: SharedStateCoordinatorStub },
-        { provide: LeaderElectionService, useClass: StubLeaderElectionService }
-      ]
-    });
-
-    const coordinator = TestBed.inject(SharedStateCoordinatorService) as unknown as SharedStateCoordinatorStub;
-    coordinator.readPersistedState.mockReturnValue(distributedState);
-    coordinator.publishState.mockClear();
-
-    const restoredService = TestBed.inject(SessionTimeoutService);
-    const restoredSnapshot = restoredService.getSnapshot();
-    const restoredConfig = restoredService.getConfig();
-
-    expect(restoredConfig.syncMode).toBe('distributed');
-    expect(restoredSnapshot.state).toBe('COUNTDOWN');
-    expect(restoredSnapshot.remainingMs).toBe(720);
-    expect(restoredSnapshot.paused).toBe(false);
-
-    expect(coordinator.publishState).toHaveBeenCalledTimes(1);
-    const [persisted, options] = coordinator.publishState.mock.calls[0] as [SharedSessionState, { persist?: boolean; broadcast?: boolean }];
-    expect(persisted).toBe(distributedState);
-    expect(options).toMatchObject({ persist: true, broadcast: false });
-
-    const internal = restoredService as unknown as { lamportClock: number; latestSharedState: SharedSessionState | null };
-    expect(internal.lamportClock).toBe(distributedState.metadata.logicalClock);
-    expect(internal.latestSharedState?.metadata.writerId).toBe('remote-persist');
-
-    TestBed.resetTestingModule();
-  });
 
   it('requests leader sync when no leader is known on init', () => {
     const reasons = requestSyncMock.mock.calls.map(call => call[0]);
