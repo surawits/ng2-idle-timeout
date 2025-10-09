@@ -294,6 +294,11 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 | `expireNow` | `expireNow(reason?): void` | Force an immediate expiry and emit `Expired`. |
 | `setConfig` | `setConfig(partial: SessionTimeoutPartialConfig): void` | Merge and validate configuration updates at runtime. |
 | `getSnapshot` | `getSnapshot(): SessionSnapshot` | Retrieve an immutable snapshot of the current state. |
+| `getLeaderState` | `getLeaderState(): SessionLeaderState` | Combine the current tab role with leader metadata (ID, epoch, heartbeat). |
+| `getLeaderRole` | `getLeaderRole(): SessionLeaderRole` | Quick way to read whether this tab is the leader, a follower, or awaiting election. |
+| `getLeaderId` | `getLeaderId(): string \| null` | Returns the most recent leader ID known to this tab. |
+| `getLeaderInfo` | `getLeaderInfo(): LeaderInfo \| null` | Returns the shared-state leader metadata when available. |
+| `isLeader` | `isLeader(): boolean` | Indicates if this tab currently acts as the leader. |
 | `registerOnExpireCallback` | `registerOnExpireCallback(handler): void` | Attach additional async logic when expiry happens. |
 
 ### Signals and streams
@@ -308,11 +313,36 @@ Calling `setConfig` applies the change immediately, so you can toggle listeners 
 | `remainingMsSignal` | `remainingMs$` | `number` | Alias of total remaining time for legacy integrations. |
 | `isWarnSignal` | `isWarn$` | `boolean` | `true` when the countdown has entered the warn window. |
 | `isExpiredSignal` | `isExpired$` | `boolean` | `true` after expiry. |
+| `leaderRoleSignal` | `leaderRole$` | `SessionLeaderRole` | Current tab role: `'leader'`, `'follower'`, or `'unknown'`. |
+| `leaderStateSignal` | `leaderState$` | `SessionLeaderState` | Role plus leader ID/metadata derived from shared state. |
+| `leaderIdSignal` | `leaderId$` | `string \| null` | Latest leader ID even while following another tab. |
+| `leaderInfoSignal` | `leaderInfo$` | `LeaderInfo \| null` | Leader metadata including epoch and heartbeat timestamp. |
+| `isLeaderSignal` | `isLeader$` | `boolean` | `true` while this tab owns leadership. |
 | n/a | `events$` | `Observable<SessionEvent>` | Structured lifecycle events (Started, Warn, Extended, etc.). |
 | n/a | `activity$` | `Observable<ActivityEvent>` | Activity resets originating from DOM/router/HTTP/manual triggers. |
 | n/a | `crossTab$` | `Observable<CrossTabMessage>` | Broadcast payloads when cross-tab sync is enabled. |
 
 `remainingMs$` is the same stream instance as `totalRemainingMs$`, preserving backwards compatibility while avoiding duplicate emissions.
+
+#### Tracking leader vs follower role
+
+The leader helpers let you drive UI that only the primary tab should see (or expose diagnostics in followers). Signals mirror observables, so you can pick whichever fits your change detection strategy:
+
+```ts
+import { Component, computed, inject } from '@angular/core';
+import { SessionTimeoutService } from 'ng2-idle-timeout';
+
+@Component({ /* ... */ })
+export class SessionDiagnosticsComponent {
+  private readonly sessionTimeout = inject(SessionTimeoutService);
+
+  readonly leaderState = this.sessionTimeout.leaderStateSignal;
+  readonly role = computed(() => this.sessionTimeout.leaderRoleSignal());
+  readonly isLeader = computed(() => this.sessionTimeout.isLeaderSignal());
+}
+```
+
+The matching observables (`leaderState$`, `leaderRole$`, `isLeader$`, etc.) remain available for `async` pipe usage.
 
 ### Tokens and supporting providers
 

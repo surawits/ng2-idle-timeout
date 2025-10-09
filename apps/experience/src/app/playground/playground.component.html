@@ -49,6 +49,9 @@
     <div class="card-body">
       <h3 class="card-title">Configuration</h3>
       <h6 class="card-subtitle mb-3 text-muted">Update values to see changes instantly</h6>
+      <div class="alert alert-warning small" *ngIf="!canEditConfig()">
+        This tab is following the active leader. Open the playground in the leader tab to tweak configuration.
+      </div>
 
       <div class="row g-3">
         <div class="col-12 col-md-6">
@@ -62,6 +65,7 @@
             step="5"
             min="5"
             max="1800"
+            [disabled]="!canEditConfig()"
           />
         </div>
         <div class="col-12 col-md-6">
@@ -75,6 +79,7 @@
             step="15"
             min="60"
             max="7200"
+            [disabled]="!canEditConfig()"
           />
         </div>
         <div class="col-12 col-md-6">
@@ -88,6 +93,7 @@
             step="15"
             min="15"
             [max]="countdownSeconds"
+            [disabled]="!canEditConfig()"
           />
         </div>
         <div class="col-12 col-md-6">
@@ -101,6 +107,7 @@
             step="1"
             min="0"
             max="600"
+            [disabled]="!canEditConfig()"
           />
           <small class="text-muted d-block mt-1">Minimum gap between DOM/router activity resets.</small>
         </div>
@@ -113,6 +120,7 @@
               role="switch"
               [(ngModel)]="autoResume"
               (change)="applyConfig()"
+              [disabled]="!canEditConfig()"
             />
             <label class="form-check-label" for="autoResume">Auto resume on server sync</label>
           </div>
@@ -126,6 +134,7 @@
               role="switch"
               [(ngModel)]="resetOnWarningActivity"
               (change)="applyConfig()"
+              [disabled]="!canEditConfig()"
             />
             <label class="form-check-label" for="resetOnWarningActivity">Reset when warning activity is detected</label>
           </div>
@@ -141,6 +150,7 @@
                   [id]="'dom-event-' + eventName"
                   [checked]="isDomEventSelected(eventName)"
                   (change)="toggleDomEvent(eventName, $event)"
+                  [disabled]="!canEditConfig()"
                 />
                 <label class="form-check-label" [for]="'dom-event-' + eventName">
                   {{ domEventLabel(eventName) }}
@@ -298,6 +308,27 @@
             <span class="metric-value">{{ warningModalCountdownSeconds() }} s</span>
           </div>
         </div>
+      </div>
+
+      <div class="telemetry-role d-flex flex-column flex-md-row justify-content-between align-items-start gap-2 gap-md-3 border-top pt-3 mt-3">
+        <div class="d-flex align-items-center gap-2">
+          <span class="label fw-semibold text-secondary">Tab role</span>
+          <span class="badge" [ngClass]="leaderRoleBadgeClass()">{{ leaderRoleLabel() }}</span>
+        </div>
+        <ng-container *ngIf="leaderDetails() as leader; else awaitingLeader">
+          <div class="text-muted small">
+            <code class="font-monospace">{{ leader.id }}</code>
+            <ng-container *ngIf="leader.epoch != null">
+              &bull; epoch {{ leader.epoch }}
+            </ng-container>
+            <ng-container *ngIf="leader.heartbeatAt != null">
+              &bull; heartbeat {{ leader.heartbeatAt | date: 'HH:mm:ss' }}
+            </ng-container>
+          </div>
+        </ng-container>
+        <ng-template #awaitingLeader>
+          <div class="text-muted small">Waiting for leader election</div>
+        </ng-template>
       </div>
 
       <div class="telemetry-state">

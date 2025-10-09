@@ -30,6 +30,7 @@
 - cp9e-extend-idle-reset: Done
 - cp9f-distributed-removal: Done
 - cp10-pages-deploy: Done
+- cp11-leader-diagnostics: Done
 
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
@@ -83,3 +84,9 @@
 - 2025-10-09 13:05 - Refined `SessionTimeoutService.extend` to refresh idle anchors, aligned cross-tab fallback, added service/cross-tab specs, and ran `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand`.
 - 2025-10-09 13:50 - Started CP9f distributed mode removal; prioritised deprecating syncMode config, code cleanup, and playground updates.
 - 2025-10-09 14:45 - Completed CP9f distributed mode removal; removed syncMode config path, updated shared-state flows/docs/playground, and re-ran focused Jest suites (`npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand`).
+
+- 2025-10-09 23:40 - Completed CP11 leader diagnostics: exposed leader/follower APIs, updated playground telemetry, refreshed README, and verified targeted Jest suites.
+
+- 2025-10-09 23:55 - Ran full library Jest suite (
+pm run test --workspace=ng2-idle-timeout) after leader diagnostics work; resolved legacy syncMode cleanup to keep configs schema-safe.
+

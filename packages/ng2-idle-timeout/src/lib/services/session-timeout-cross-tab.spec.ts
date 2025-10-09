@@ -226,6 +226,14 @@ describe('SessionTimeoutService cross-tab sync', () => {
     return service.getSnapshot();
   }
 
+  function leaderRole(): string {
+    return service.leaderRoleSignal();
+  }
+
+  function leaderInfo(): SharedSessionState['leader'] | null {
+    return service.leaderInfoSignal();
+  }
+
   function buildSharedState(
     overrides?: Partial<Omit<SharedSessionState, 'config' | 'metadata'>> & {
       config?: Partial<SharedSessionState['config']>;
@@ -896,6 +904,50 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(current.remainingMs).toBe(remoteState.snapshot.remainingMs);
     expect(current.countdownEndAt).toBe(remoteState.snapshot.countdownEndAt);
     expect(current.idleStartAt).toBe(remoteState.snapshot.idleStartAt);
+  });
+
+  it('surfaces leader and follower roles through signals when leadership changes', async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+
+    service.start();
+    await flushAsync();
+
+    leader.electLeader();
+    await flushAsync();
+
+    expect(leaderRole()).toBe('leader');
+    expect(leaderInfo()?.id).toBe(leader.leaderId());
+
+    leader.stepDown();
+    await flushAsync();
+
+    const remoteState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: time.now(), epoch: 2 }
+    });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: remoteState
+    });
+
+    await flushAsync();
+
+    expect(leaderRole()).toBe('follower');
+    expect(leaderInfo()?.id).toBe('remote-tab');
+
+    const clearedState = buildSharedState({ leader: null });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: clearedState
+    });
+
+    await flushAsync();
+
+    expect(leaderRole()).toBe('unknown');
+    expect(leaderInfo()).toBeNull();
   });
 
   it('increments leader epoch using latest shared state metadata', async () => {

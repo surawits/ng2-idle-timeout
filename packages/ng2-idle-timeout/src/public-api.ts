@@ -13,6 +13,7 @@ export * from './lib/models/session-state';
 export * from './lib/models/activity-event';
 export * from './lib/models/cross-tab-message';
 export * from './lib/models/session-shared-state';
+export * from './lib/models/session-leader';
 export * from './lib/utils/storage';
 export * from './lib/utils/broadcast-channel';
 export * from './lib/utils/logging';

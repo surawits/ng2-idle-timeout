@@ -13,6 +13,18 @@
 - npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/server-time.service.spec.ts
 - npm run demo:test
 
+## Patch 0.3.4 (2025-10-09)
+
+### Highlights
+- Added leader/follower diagnostics on `SessionTimeoutService`, including signals and getters that expose the current role and leader heartbeat metadata.
+- Updated the experience playground to surface the active tab role, show leader metadata, and disable configuration editing when the tab is a follower.
+- Documented the new leader diagnostics in the library README and synced sprint planning with the CP11 checkpoint.
+- Normalised legacy `syncMode` inputs out of persisted config during validation so published packs stay schema-safe.
+
+### Verification
+- npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand
+- npm run test --workspace=ng2-idle-timeout
+
 ## Patch 0.3.3 (2025-10-09)
 
 ### Highlights

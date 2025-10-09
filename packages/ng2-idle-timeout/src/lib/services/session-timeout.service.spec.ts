@@ -314,6 +314,18 @@ describe('SessionTimeoutService', () => {
     (service as unknown as { requestLeaderSync: (reason: string, options?: { force?: boolean }) => void }).requestLeaderSync(reason, options);
   }
 
+  function leaderRole(): string {
+    return service.getLeaderRole();
+  }
+
+  function leaderInfo(): SharedSessionState['leader'] | null {
+    return service.getLeaderInfo();
+  }
+
+  function isLeaderTab(): boolean {
+    return service.isLeader();
+  }
+
 
 
   function buildSharedState(
@@ -1044,6 +1056,77 @@ describe('SessionTimeoutService', () => {
     time.advance(HEARTBEAT_INTERVAL_MS + 1);
     requestLeaderSync('manual-after-wait');
     expect(requestSyncMock).toHaveBeenCalledWith('manual-after-wait');
+  });
+
+  it('exposes leader role and metadata when this tab is leader', async () => {
+    leaderElection.assumeLeader(leaderElection.tabId);
+    service.start();
+    await flushAsync();
+
+    expect(isLeaderTab()).toBe(true);
+    expect(service.isLeaderSignal()).toBe(true);
+    expect(leaderRole()).toBe('leader');
+    expect(service.leaderRoleSignal()).toBe('leader');
+    expect(service.leaderIdSignal()).toBe(leaderElection.tabId);
+
+    const info = leaderInfo();
+    expect(info?.id).toBe(leaderElection.tabId);
+
+    const leaderState = service.getLeaderState();
+    expect(leaderState.role).toBe('leader');
+    expect(leaderState.leaderId).toBe(leaderElection.tabId);
+    expect(leaderState.leader?.epoch).toBeGreaterThanOrEqual(1);
+  });
+
+  it('updates leader indicators when a remote leader broadcast arrives', async () => {
+    service.start();
+    await flushAsync();
+
+    leaderElection.assumeLeader('remote-tab');
+    await flushAsync();
+
+    const remoteState = buildSharedState({
+      leader: { id: 'remote-tab', heartbeatAt: time.now(), epoch: 3 }
+    });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: remoteState
+    });
+
+    await flushAsync();
+
+    expect(isLeaderTab()).toBe(false);
+    expect(service.isLeaderSignal()).toBe(false);
+    expect(leaderRole()).toBe('follower');
+    expect(service.leaderRoleSignal()).toBe('follower');
+    expect(service.leaderIdSignal()).toBe('remote-tab');
+
+    const followerInfo = leaderInfo();
+    expect(followerInfo?.id).toBe('remote-tab');
+    expect(followerInfo?.epoch).toBe(3);
+
+    const followerState = service.getLeaderState();
+    expect(followerState.role).toBe('follower');
+    expect(followerState.leaderId).toBe('remote-tab');
+    expect(followerState.leader?.heartbeatAt).toBe(remoteState.leader?.heartbeatAt);
+
+    leaderElection.stepDown();
+    const clearedState = buildSharedState({ leader: null });
+    sharedCoordinator.emit({
+      type: 'state',
+      sourceId: 'remote-tab',
+      at: time.now(),
+      state: clearedState
+    });
+
+    await flushAsync();
+
+    expect(leaderRole()).toBe('unknown');
+    expect(service.leaderRoleSignal()).toBe('unknown');
+    expect(service.leaderIdSignal()).toBeNull();
+    expect(leaderInfo()).toBeNull();
   });
 
   it('increments leader epoch when taking leadership after remote shared state', async () => {

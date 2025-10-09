@@ -5,7 +5,8 @@ describe('validateConfig legacy syncMode handling', () => {
     const result = validateConfig({ syncMode: 'distributed' } as unknown as Record<string, unknown>);
 
     expect(result.issues.find(issue => issue.field === 'syncMode')).toBeDefined();
-    expect((result.config as Record<string, unknown>).syncMode).toBeUndefined();
+    const configRecord = result.config as unknown as Record<string, unknown>;
+    expect(configRecord.syncMode).toBeUndefined();
   });
 
   it('does not report an issue when syncMode is omitted', () => {

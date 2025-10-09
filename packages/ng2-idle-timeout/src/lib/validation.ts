@@ -87,12 +87,24 @@ interface NormalizedConfigResult {
   removedSyncMode: string | undefined;
 }
 
+type MutablePartialConfig = SessionTimeoutPartialConfig & Record<string, unknown>;
+
 function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): NormalizedConfigResult {
   const base: SessionTimeoutConfig = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG,
     domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
   };
-  const { httpActivity, actionDelays, domActivityEvents, ...shallow } = partial ?? {};
+
+  const working = (partial ? { ...partial } : {}) as MutablePartialConfig;
+  let removedSyncMode: string | undefined;
+
+  if ('syncMode' in working) {
+    const syncModeValue = working['syncMode'];
+    removedSyncMode = syncModeValue === null ? 'null' : String(syncModeValue);
+    delete working['syncMode'];
+  }
+
+  const { httpActivity, actionDelays, domActivityEvents, ...shallow } = working;
 
   const merged: SessionTimeoutConfig = {
     ...base,
@@ -109,13 +121,6 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Norm
   };
 
   const invalidDomActivityEvents: string[] = [];
-  let removedSyncMode: string | undefined;
-
-  if (partial && 'syncMode' in (partial as Record<string, unknown>)) {
-    const syncModeValue = (partial as Record<string, unknown>)['syncMode'];
-    removedSyncMode = syncModeValue === null ? 'null' : String(syncModeValue);
-  }
-
   if (Array.isArray(domActivityEvents)) {
     const deduped: DomActivityEventName[] = [];
     const seen = new Set<string>();

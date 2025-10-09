@@ -9,7 +9,12 @@ import type { ActivityEvent } from '../models/activity-event';
 import type { SessionEvent } from '../models/session-event';
 import type { SessionSnapshot, SessionState } from '../models/session-state';
 import type { CrossTabMessage, CrossTabMessageType } from '../models/cross-tab-message';
-import { SHARED_STATE_VERSION, type SharedSessionState, type SharedStateOperation } from '../models/session-shared-state';
+import {
+  SHARED_STATE_VERSION,
+  type LeaderInfo,
+  type SharedSessionState,
+  type SharedStateOperation
+} from '../models/session-shared-state';
 import { createBroadcastChannel, type BroadcastAdapter } from '../utils/broadcast-channel';
 import type {
   SessionTimeoutConfig,
@@ -23,6 +28,7 @@ import { SESSION_TIMEOUT_CONFIG, SESSION_TIMEOUT_HOOKS } from '../tokens/config.
 import { createLogger, type Logger } from '../utils/logging';
 import { TimeSourceService } from './time-source.service';
 import { ServerTimeService } from './server-time.service';
+import type { SessionLeaderState, SessionLeaderRole } from '../models/session-leader';
 import { validateConfig } from '../validation';
 import { ActivityDomService } from './activity-dom.service';
 import { ActivityRouterService } from './activity-router.service';
@@ -70,6 +76,8 @@ export class SessionTimeoutService {
   private leaderState: boolean | null = null;
   private leaderEpoch = 0;
   private lastKnownLeaderId: string | null = null;
+  private readonly leaderIdInternal = signal<string | null>(null);
+  private readonly leaderInfoInternal = signal<LeaderInfo | null>(null);
   private latestSharedState: SharedSessionState | null = null;
   private sharedStateRevision = 0;
   private sharedConfigRevision = 0;
@@ -157,6 +165,14 @@ export class SessionTimeoutService {
   private readonly totalRemainingMsInternal = signal(0);
   private readonly activityCooldownRemainingMsInternal = signal(0);
 
+  private readonly leaderRoleInternal = signal<SessionLeaderRole>('unknown');
+
+  private readonly leaderStateSignalInternal = computed<SessionLeaderState>(() => ({
+    role: this.leaderRoleInternal(),
+    leader: this.leaderInfoInternal(),
+    leaderId: this.leaderIdInternal()
+  }));
+
   readonly idleRemainingMsSignal = this.idleRemainingMsInternal.asReadonly();
   readonly activityCooldownRemainingMsSignal = this.activityCooldownRemainingMsInternal.asReadonly();
   readonly countdownRemainingMsSignal = this.countdownRemainingMsInternal.asReadonly();
@@ -179,9 +195,19 @@ export class SessionTimeoutService {
   readonly isExpired$ = toObservable(this.isExpiredSignal);
   readonly lastActivityAt$ = toObservable(this.lastActivitySignal);
   readonly countdownEndAt$ = toObservable(this.countdownEndAtSignal);
+  readonly leaderIdSignal = this.leaderIdInternal.asReadonly();
+  readonly leaderInfoSignal = this.leaderInfoInternal.asReadonly();
+  readonly leaderRoleSignal = this.leaderRoleInternal.asReadonly();
+  readonly leaderStateSignal = this.leaderStateSignalInternal;
   readonly events$ = this.eventsSubject.asObservable();
   readonly activity$ = this.activitySubject.asObservable();
   readonly crossTab$ = this.crossTabSubject.asObservable();
+  readonly leaderId$ = toObservable(this.leaderIdSignal);
+  readonly leaderInfo$ = toObservable(this.leaderInfoSignal);
+  readonly leaderRole$ = toObservable(this.leaderRoleSignal);
+  readonly leaderState$ = toObservable(this.leaderStateSignal);
+  readonly isLeaderSignal: Signal<boolean> = computed(() => this.leaderRoleSignal() === 'leader');
+  readonly isLeader$ = toObservable(this.isLeaderSignal);
 
   private readonly configWatcher = effect(() => {
     const config = this.configSignal();
@@ -527,6 +553,35 @@ export class SessionTimeoutService {
 
   getConfig(): SessionTimeoutConfig {
     return { ...this.configSignal() };
+  }
+
+  getLeaderId(): string | null {
+    return this.leaderIdSignal();
+  }
+
+  getLeaderInfo(): LeaderInfo | null {
+    const info = this.leaderInfoSignal();
+    if (!info) {
+      return null;
+    }
+    return { ...info };
+  }
+
+  getLeaderRole(): SessionLeaderRole {
+    return this.leaderRoleSignal();
+  }
+
+  getLeaderState(): SessionLeaderState {
+    const state = this.leaderStateSignal();
+    return {
+      role: state.role,
+      leaderId: state.leaderId,
+      leader: state.leader ? { ...state.leader } : null
+    };
+  }
+
+  isLeader(): boolean {
+    return this.isLeaderSignal();
   }
 
   private restartTicker(pollingMs: number): void {
@@ -1064,12 +1119,13 @@ export class SessionTimeoutService {
       state = this.latestSharedState;
     } else {
       state = this.buildSharedSessionState(operation, options?.configChanged === true);
-      this.latestSharedState = state;
     }
 
     if (!state) {
       return;
     }
+
+    this.updateTrackingFromState(state);
 
     this.sharedStateCoordinator.publishState(state, { persist, broadcast: crossTab });
     if (crossTab) {
@@ -1226,6 +1282,19 @@ export class SessionTimeoutService {
     this.sharedConfigRevision = sharedState.config.revision;
     this.configLamportClock = Math.max(this.configLamportClock, sharedState.config.logicalClock);
     this.configWriterId = sharedState.config.writerId;
+    const leaderInfo = sharedState.leader ?? null;
+    this.leaderInfoInternal.set(leaderInfo);
+    const electionLeaderId = this.leaderElection?.leaderId?.() ?? null;
+    const nextLeaderId = electionLeaderId ?? leaderInfo?.id ?? null;
+    this.leaderIdInternal.set(nextLeaderId);
+    const leaderElectionState = this.leaderElection?.isLeader?.() ?? null;
+    if (leaderElectionState === true) {
+      this.leaderRoleInternal.set('leader');
+    } else if (nextLeaderId) {
+      this.leaderRoleInternal.set('follower');
+    } else {
+      this.leaderRoleInternal.set('unknown');
+    }
   }
 
   private handleSyncRequest(): void {
@@ -1397,12 +1466,21 @@ export class SessionTimeoutService {
       return;
     }
     const isLeader = this.leaderElection.isLeader();
-    const leaderId = this.leaderElection.leaderId();
+    const electionLeaderId = this.leaderElection.leaderId();
+    const leaderId = electionLeaderId ?? this.latestSharedState?.leader?.id ?? null;
     const previousRole = this.leaderState;
     const previousLeaderId = this.lastKnownLeaderId;
 
     this.leaderState = isLeader;
-    this.lastKnownLeaderId = leaderId ?? null;
+    this.lastKnownLeaderId = leaderId;
+    this.leaderIdInternal.set(leaderId);
+    if (isLeader) {
+      this.leaderRoleInternal.set('leader');
+    } else if (leaderId) {
+      this.leaderRoleInternal.set('follower');
+    } else {
+      this.leaderRoleInternal.set('unknown');
+    }
 
     if (previousRole === null) {
       if (isLeader) {

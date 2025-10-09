@@ -168,3 +168,11 @@ items:
   notes: GitHub Pages workflow for apps/experience, artifact upload, docs sync
   dependencies:
   - cp9d-verification
+- id: cp11-leader-diagnostics
+  title: Checkpoint 11 - Leader diagnostics & docs
+  owner: codex
+  status: Done
+  notes: leader/follower APIs, playground telemetry, README guidance, targeted tests
+  dependencies:
+  - cp10-pages-deploy
+

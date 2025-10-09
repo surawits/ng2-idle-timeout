@@ -157,6 +157,45 @@ export class PlaygroundComponent {
     };
   });
 
+  private readonly leaderState = this.sessionTimeout.leaderStateSignal;
+  private readonly leaderRoleInternal = this.sessionTimeout.leaderRoleSignal;
+
+  readonly leaderRoleLabel = computed(() => {
+    const role = this.leaderRoleInternal();
+    if (role === 'leader') {
+      return 'Leader';
+    }
+    if (role === 'follower') {
+      return 'Follower';
+    }
+    return 'No leader yet';
+  });
+
+  readonly leaderRoleBadgeClass = computed(() => {
+    const role = this.leaderRoleInternal();
+    if (role === 'leader') {
+      return 'text-bg-primary';
+    }
+    if (role === 'follower') {
+      return 'text-bg-info text-dark';
+    }
+    return 'text-bg-light text-dark';
+  });
+
+  readonly canEditConfig = computed(() => this.leaderRoleInternal() !== 'follower');
+
+  readonly leaderDetails = computed(() => {
+    const state = this.leaderState();
+    if (!state.leaderId) {
+      return null;
+    }
+    return {
+      id: state.leaderId,
+      epoch: state.leader?.epoch ?? null,
+      heartbeatAt: state.leader?.heartbeatAt ?? null
+    };
+  });
+
   readonly snapshot = computed(() => this.sessionTimeout.getSnapshot());
   readonly sessionState = computed(() => this.snapshot().state);
   readonly isSessionActive = computed(() => {
@@ -297,7 +336,7 @@ export class PlaygroundComponent {
   }
 
   applyConfig(): void {
-    if (this.isObserverMode) {
+    if (this.isObserverMode || !this.canEditConfig()) {
       return;
     }
     const domActivityEvents = this.currentDomActivityEvents();
@@ -324,7 +363,7 @@ export class PlaygroundComponent {
   }
 
   toggleDomEvent(event: DomActivityEventName, change: Event): void {
-    if (this.isObserverMode) {
+    if (this.isObserverMode || !this.canEditConfig()) {
       return;
     }
     const target = change.target;

@@ -52,10 +52,14 @@
     - [x] 9f Remove distributed mode (service, coordinator, docs, playground).
 - [x] Checkpoint 10 â€“ Playground Deployment Automation
   - Deliverables: GitHub Pages workflow building `apps/experience`, automated artifact upload, deployment documentation updates.
+- [x] Checkpoint 11 — Leader Diagnostics & Docs
+  - Deliverables: leader/follower API surface, playground telemetry updates, README examples, automated coverage.
+
 ## Risks & Assumptions
 - Broadcast/storage APIs available in targeted browsers; fallbacks validated.
 - Time source differences reconciled via coordinator metadata.
 - Existing consumers prepared for potential breaking changes.
+
 
 
 
