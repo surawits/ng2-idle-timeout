@@ -47,3 +47,4 @@ Reference for predictable ng2-idle-timeout work.
 
 ## Maintenance & Updates
 - Keep this guide aligned with `.github/workflows/`, `scripts/control/`, and tool changes; capture new tooling decisions or release steps in `RELEASE_NOTES.md`.
+- Store only the latest `ng2-idle-timeout-*.tgz` artifact in the repo—delete superseded tarballs before committing.

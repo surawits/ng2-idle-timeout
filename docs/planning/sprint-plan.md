@@ -63,3 +63,11 @@
 
 
 
+- [x] Checkpoint 12 - Package Reissue 0.3.4
+  - Sub-checkpoints:
+    - [x] Confirm 0.3.5 publish regression (raw TS sources, missing compiled output).
+    - [x] Revert workspace versioning/docs to 0.3.4 and add dist-based packaging scripts.
+    - [x] Rebuild and pack from packages/ng2-idle-timeout/dist, verify compiled JS and typings ship.
+    - [x] Sync planning records and document republish guidance.
+    - [x] Documented 0.3.6 fallback after npm rejected the 0.3.4 republish.
+    - [x] Published 0.3.6 to npm via updated publish:lib workflow.

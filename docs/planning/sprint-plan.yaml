@@ -176,3 +176,10 @@ items:
   dependencies:
   - cp10-pages-deploy
 
+- id: cp12-packaging-reissue
+  title: Checkpoint 12 - Package Reissue 0.3.4
+  owner: codex
+  status: Done
+  notes: revert version to 0.3.4, fix packaging workflow, rebuild tarball, sync docs, capture 0.3.6 fallback plan, publish to npm
+  dependencies:
+  - cp11-leader-diagnostics

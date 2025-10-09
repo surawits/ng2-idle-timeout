@@ -1,6 +1,6 @@
 {
   "name": "ng2-idle-timeout",
-  "version": "0.3.4",
+  "version": "0.3.6",
   "description": "Zoneless-friendly session timeout management for Angular 16 and later (verified through v20).",
   "author": "",
   "license": "MIT",

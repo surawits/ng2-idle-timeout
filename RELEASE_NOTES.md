@@ -13,7 +13,28 @@
 - npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/server-time.service.spec.ts
 - npm run demo:test
 
-## Patch 0.3.4 (2025-10-09)
+## Patch 0.3.6 (2025-10-09)
+
+### Highlights
+- Reissued the fixed leader diagnostics build on top of `0.3.4` with the correct ng-packagr output; supersedes the retracted `0.3.5`.
+- Updated workspace scripts (`npm run pack:lib`, `npm run publish:lib`) so future publishes always target `packages/ng2-idle-timeout/dist`.
+- Documented the packaging regression and mitigation across release and planning records.
+
+### Verification
+- npm run build --workspace=ng2-idle-timeout
+- npm run pack:lib
+
+## Patch 0.3.5 (2025-10-09) — Retracted
+
+### Highlights
+- Ensured `createSessionTimeoutProviders` ships in the published bundle and clarified compatibility messaging (Angular 16 and later, verified through v20).
+- Regenerated the npm package manifest so README and package metadata match the new wording.
+
+### Status
+- Retracted because `npm pack --workspace=ng2-idle-timeout` bundled raw TypeScript sources without the ng-packagr build output, leading to module resolution errors downstream.
+- Superseded by a republished `0.3.4` package built from `packages/ng2-idle-timeout/dist`.
+
+## Patch 0.3.4 (2025-10-09, republished 2025-10-09)
 
 ### Highlights
 - Added leader/follower diagnostics on `SessionTimeoutService`, including signals and getters that expose the current role and leader heartbeat metadata.
@@ -24,6 +45,8 @@
 ### Verification
 - npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/services/session-timeout.service.spec.ts packages/ng2-idle-timeout/src/lib/services/session-timeout-cross-tab.spec.ts --runInBand
 - npm run test --workspace=ng2-idle-timeout
+- npm run build --workspace=ng2-idle-timeout
+- npm pack packages/ng2-idle-timeout/dist
 
 ## Patch 0.3.3 (2025-10-09)
 

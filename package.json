@@ -14,6 +14,8 @@
     "test": "npm run test --workspace=ng2-idle-timeout",
     "test:unit": "npm run test --workspace=ng2-idle-timeout",
     "test:e2e": "npm run demo:test",
+    "pack:lib": "npm pack packages/ng2-idle-timeout/dist",
+    "publish:lib": "npm publish packages/ng2-idle-timeout/dist",
     "format": "prettier --write \"**/*.{ts,js,json,md}\"",
     "control:inspect": "node --experimental-strip-types scripts/control/inspect.ts",
     "demo:start": "npm --prefix apps/experience run start",

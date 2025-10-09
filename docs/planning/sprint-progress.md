@@ -31,6 +31,7 @@
 - cp9f-distributed-removal: Done
 - cp10-pages-deploy: Done
 - cp11-leader-diagnostics: Done
+- cp12-packaging-reissue: Done
 
 ## Log
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
@@ -90,3 +91,7 @@
 - 2025-10-09 23:55 - Ran full library Jest suite (
 pm run test --workspace=ng2-idle-timeout) after leader diagnostics work; resolved legacy syncMode cleanup to keep configs schema-safe.
 
+- 2025-10-09 06:13 - Confirmed 0.3.5 publish regression (TS sources without compiled output), reverted the workspace to 0.3.4, rebuilt via ng-packagr, generated npm pack from packages/ng2-idle-timeout/dist, and updated release/publishing guidance.
+- 2025-10-09 06:15 - Attempted to publish 0.3.4 reissue; npm rejected previously published version, transitioning to 0.3.6 republish plan.
+- 2025-10-09 06:17 - Built and packed 0.3.6 from packages/ng2-idle-timeout/dist using updated scripts.
+- 2025-10-09 06:18 - Published ng2-idle-timeout@0.3.6 using npm run publish:lib (OTP 201914).
