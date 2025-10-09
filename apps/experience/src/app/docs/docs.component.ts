@@ -48,7 +48,7 @@ export class DocsComponent {
                                         cross-tab | persistence`;
 
   readonly compatibilityMatrix = [
-    { package: 'ng2-idle-timeout', angular: '16+', node: '>=18.13', rxjs: '>=7.5 < 9' }
+    { package: 'ng2-idle-timeout', angular: '16+ (tested through 20)', node: '>=18.13', rxjs: '>=7.5 < 9' }
   ];
 
   readonly providerSnippet = `// session-timeout.providers.ts
