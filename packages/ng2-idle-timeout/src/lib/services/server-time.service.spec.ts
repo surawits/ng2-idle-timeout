@@ -1,12 +1,12 @@
-import { HttpClient } from '@angular/common/http';
-import { NgZone } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { HttpClient } from "@angular/common/http";
+import { NgZone } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
+import { of, throwError } from "rxjs";
 
-import { ServerTimeService } from './server-time.service';
-import { TimeSourceService } from './time-source.service';
-import type { SessionTimeoutConfig } from '../models/session-timeout-config';
-import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
+import { ServerTimeService } from "./server-time.service";
+import { TimeSourceService } from "./time-source.service";
+import type { SessionTimeoutConfig } from "../models/session-timeout-config";
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from "../defaults";
 
 const baseConfig: SessionTimeoutConfig = {
   idleGraceMs: 200,
@@ -14,18 +14,18 @@ const baseConfig: SessionTimeoutConfig = {
   warnBeforeMs: 300,
   pollingMs: 50,
   activityResetCooldownMs: 0,
-  storageKeyPrefix: 'test',
-  appInstanceId: 'testApp',
-  strategy: 'userOnly',
+  storageKeyPrefix: "test",
+  appInstanceId: "testApp",
+  strategy: "userOnly",
   httpActivity: {
     enabled: false,
-    strategy: 'allowlist',
+    strategy: "allowlist",
     allowlist: [],
     denylist: [],
     ignoreOnInitMs: 0,
     cooldownMs: 0,
     onlyWhenTabFocused: false,
-    primaryTabOnly: false
+    primaryTabOnly: false,
   },
   actionDelays: {
     start: 0,
@@ -34,24 +34,24 @@ const baseConfig: SessionTimeoutConfig = {
     extend: 0,
     pause: 0,
     resume: 0,
-    expire: 0
+    expire: 0,
   },
-  openNewTabBehavior: 'inherit',
+  openNewTabBehavior: "inherit",
   routerCountsAsActivity: true,
   domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
   debounceMouseMs: 800,
   debounceKeyMs: 200,
   maxExtendPerSession: 0,
-  onExpire: 'emit',
-  timeSource: 'client',
+  onExpire: "emit",
+  timeSource: "client",
   serverTimeEndpoint: undefined,
-  logging: 'silent',
+  logging: "silent",
   resetOnWarningActivity: true,
   ignoreUserActivityWhenPaused: false,
-  allowManualExtendWhenExpired: false
+  allowManualExtendWhenExpired: false,
 };
 
-describe('ServerTimeService', () => {
+describe("ServerTimeService", () => {
   let service: ServerTimeService;
   let httpClient: { get: jest.Mock };
   let timeSource: { setOffset: jest.Mock; resetOffset: jest.Mock };
@@ -60,7 +60,7 @@ describe('ServerTimeService', () => {
     httpClient = { get: jest.fn() };
     timeSource = {
       setOffset: jest.fn(),
-      resetOffset: jest.fn()
+      resetOffset: jest.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -68,8 +68,11 @@ describe('ServerTimeService', () => {
         ServerTimeService,
         { provide: HttpClient, useValue: httpClient },
         { provide: TimeSourceService, useValue: timeSource },
-        { provide: NgZone, useFactory: () => new NgZone({ enableLongStackTrace: false }) }
-      ]
+        {
+          provide: NgZone,
+          useFactory: () => new NgZone({ enableLongStackTrace: false }),
+        },
+      ],
     });
 
     service = TestBed.inject(ServerTimeService);
@@ -80,13 +83,13 @@ describe('ServerTimeService', () => {
     jest.restoreAllMocks();
   });
 
-  it('resets offset when configured for client time', () => {
+  it("resets offset when configured for client time", () => {
     service.configure(baseConfig);
     expect(timeSource.resetOffset).toHaveBeenCalled();
   });
 
-  it('fetches server time and applies offset when configured', () => {
-    const nowSpy = jest.spyOn(Date, 'now');
+  it("fetches server time and applies offset when configured", () => {
+    const nowSpy = jest.spyOn(Date, "now");
     nowSpy.mockReturnValueOnce(1_000);
     nowSpy.mockReturnValueOnce(1_500);
 
@@ -94,18 +97,18 @@ describe('ServerTimeService', () => {
 
     service.configure({
       ...baseConfig,
-      timeSource: 'server',
-      serverTimeEndpoint: '/api/time'
+      timeSource: "server",
+      serverTimeEndpoint: "/api/time",
     });
 
-    expect(httpClient.get).toHaveBeenCalledWith('/api/time');
+    expect(httpClient.get).toHaveBeenCalledWith("/api/time");
     expect(timeSource.setOffset).toHaveBeenCalledWith(2_750);
 
     nowSpy.mockRestore();
   });
-  it('notifies sync listeners on successful fetch', () => {
+  it("notifies sync listeners on successful fetch", () => {
     const listener = jest.fn();
-    const nowSpy = jest.spyOn(Date, 'now');
+    const nowSpy = jest.spyOn(Date, "now");
     nowSpy.mockReturnValueOnce(1_000);
     nowSpy.mockReturnValueOnce(1_500);
 
@@ -114,8 +117,8 @@ describe('ServerTimeService', () => {
 
     service.configure({
       ...baseConfig,
-      timeSource: 'server',
-      serverTimeEndpoint: '/api/time'
+      timeSource: "server",
+      serverTimeEndpoint: "/api/time",
     });
 
     expect(listener).toHaveBeenCalledTimes(1);
@@ -124,22 +127,22 @@ describe('ServerTimeService', () => {
     nowSpy.mockRestore();
   });
 
-  it('applies retry backoff on failure and recovers on success', () => {
-    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000);
-    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+  it("applies retry backoff on failure and recovers on success", () => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    const nowSpy = jest.spyOn(Date, "now").mockReturnValue(1_000);
+    const setTimeoutSpy = jest.spyOn(global, "setTimeout");
     const internal = service as unknown as { fetchServerOffset: () => void };
 
     httpClient.get
-      .mockReturnValueOnce(throwError(() => new Error('fail')))
+      .mockReturnValueOnce(throwError(() => new Error("fail")))
       .mockReturnValueOnce(of({ epochMs: 3_000 }))
       .mockReturnValue(of({ epochMs: 3_500 }));
 
     service.configure({
       ...baseConfig,
-      timeSource: 'server',
-      serverTimeEndpoint: '/api/time',
-      pollingMs: 120_000
+      timeSource: "server",
+      serverTimeEndpoint: "/api/time",
+      pollingMs: 120_000,
     });
 
     expect(httpClient.get).toHaveBeenCalledTimes(1);
@@ -158,14 +161,14 @@ describe('ServerTimeService', () => {
     nowSpy.mockRestore();
   });
 
-  it('stops syncing and clears offset when stopped', () => {
+  it("stops syncing and clears offset when stopped", () => {
     const internal = service as unknown as { fetchServerOffset: () => void };
     httpClient.get.mockReturnValue(of(5_000));
 
     service.configure({
       ...baseConfig,
-      timeSource: 'server',
-      serverTimeEndpoint: '/api/time'
+      timeSource: "server",
+      serverTimeEndpoint: "/api/time",
     });
 
     service.stop(true);
@@ -175,5 +178,3 @@ describe('ServerTimeService', () => {
     expect(timeSource.resetOffset).toHaveBeenCalled();
   });
 });
-
-

@@ -1,10 +1,10 @@
-import { DEFAULT_SESSION_TIMEOUT_CONFIG } from './defaults';
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from "./defaults";
 import {
   DOM_ACTIVITY_EVENT_NAMES,
   type DomActivityEventName,
   type SessionTimeoutConfig,
-  type SessionTimeoutPartialConfig
-} from './models/session-timeout-config';
+  type SessionTimeoutPartialConfig,
+} from "./models/session-timeout-config";
 
 export interface ValidationIssue {
   field: string;
@@ -18,63 +18,73 @@ export interface ValidationResult {
 
 const DOM_ACTIVITY_EVENT_SET = new Set<string>(DOM_ACTIVITY_EVENT_NAMES);
 
-export function validateConfig(partial: SessionTimeoutPartialConfig | undefined): ValidationResult {
+export function validateConfig(
+  partial: SessionTimeoutPartialConfig | undefined,
+): ValidationResult {
   const issues: ValidationIssue[] = [];
-  const { config, invalidDomActivityEvents, removedSyncMode } = normalizeConfig(partial);
+  const { config, invalidDomActivityEvents, removedSyncMode } =
+    normalizeConfig(partial);
 
   if (config.idleGraceMs <= 0) {
-    issues.push(createIssue('idleGraceMs', 'Value must be greater than 0'));
+    issues.push(createIssue("idleGraceMs", "Value must be greater than 0"));
   }
   if (config.countdownMs <= 0) {
-    issues.push(createIssue('countdownMs', 'Value must be greater than 0'));
+    issues.push(createIssue("countdownMs", "Value must be greater than 0"));
   }
   if (config.warnBeforeMs < 0 || config.warnBeforeMs > config.countdownMs) {
-    issues.push(createIssue('warnBeforeMs', 'Value must be between 0 and countdownMs inclusive'));
+    issues.push(
+      createIssue(
+        "warnBeforeMs",
+        "Value must be between 0 and countdownMs inclusive",
+      ),
+    );
   }
   if (config.pollingMs <= 0) {
-    issues.push(createIssue('pollingMs', 'Value must be greater than 0'));
+    issues.push(createIssue("pollingMs", "Value must be greater than 0"));
   }
   if (config.activityResetCooldownMs < 0) {
-    issues.push(createIssue('activityResetCooldownMs', 'Value must be >= 0'));
+    issues.push(createIssue("activityResetCooldownMs", "Value must be >= 0"));
   }
   if (!config.storageKeyPrefix.trim()) {
-    issues.push(createIssue('storageKeyPrefix', 'Prefix cannot be empty'));
+    issues.push(createIssue("storageKeyPrefix", "Prefix cannot be empty"));
   }
   if (config.maxExtendPerSession < 0) {
-    issues.push(createIssue('maxExtendPerSession', 'Value must be >= 0'));
+    issues.push(createIssue("maxExtendPerSession", "Value must be >= 0"));
   }
-  if (config.timeSource === 'server' && !config.serverTimeEndpoint) {
-    issues.push(createIssue('serverTimeEndpoint', 'Required when timeSource is server'));
+  if (config.timeSource === "server" && !config.serverTimeEndpoint) {
+    issues.push(
+      createIssue("serverTimeEndpoint", "Required when timeSource is server"),
+    );
   }
   if (
-    typeof config.onExpire === 'string' &&
-    config.onExpire.startsWith('navigate:') &&
-    config.onExpire.split(':').length < 2
+    typeof config.onExpire === "string" &&
+    config.onExpire.startsWith("navigate:") &&
+    config.onExpire.split(":").length < 2
   ) {
-    issues.push(createIssue('onExpire', 'navigate: form requires target path'));
+    issues.push(createIssue("onExpire", "navigate: form requires target path"));
   }
 
   for (const [key, value] of Object.entries(config.actionDelays)) {
     if (value < 0) {
-      issues.push(createIssue(`actionDelays.${key}`, 'Value must be >= 0'));
+      issues.push(createIssue(`actionDelays.${key}`, "Value must be >= 0"));
     }
   }
 
   if (invalidDomActivityEvents.length > 0) {
     issues.push(
       createIssue(
-        'domActivityEvents',
-        `Unsupported DOM events: ${invalidDomActivityEvents.join(', ')}`
-      )
+        "domActivityEvents",
+        `Unsupported DOM events: ${invalidDomActivityEvents.join(", ")}`,
+      ),
     );
   }
 
   if (removedSyncMode !== undefined) {
     issues.push(
       createIssue(
-        'syncMode',
-        `syncMode '${removedSyncMode}' is no longer supported; leader coordination is always enforced.`
-      )
+        "syncMode",
+        `syncMode '${removedSyncMode}' is no longer supported; leader coordination is always enforced.`,
+      ),
     );
   }
 
@@ -87,21 +97,24 @@ interface NormalizedConfigResult {
   removedSyncMode: string | undefined;
 }
 
-type MutablePartialConfig = SessionTimeoutPartialConfig & Record<string, unknown>;
+type MutablePartialConfig = SessionTimeoutPartialConfig &
+  Record<string, unknown>;
 
-function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): NormalizedConfigResult {
+function normalizeConfig(
+  partial: SessionTimeoutPartialConfig | undefined,
+): NormalizedConfigResult {
   const base: SessionTimeoutConfig = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG,
-    domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
+    domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents],
   };
 
   const working = (partial ? { ...partial } : {}) as MutablePartialConfig;
   let removedSyncMode: string | undefined;
 
-  if ('syncMode' in working) {
-    const syncModeValue = working['syncMode'];
-    removedSyncMode = syncModeValue === null ? 'null' : String(syncModeValue);
-    delete working['syncMode'];
+  if ("syncMode" in working) {
+    const syncModeValue = working["syncMode"];
+    removedSyncMode = syncModeValue === null ? "null" : String(syncModeValue);
+    delete working["syncMode"];
   }
 
   const { httpActivity, actionDelays, domActivityEvents, ...shallow } = working;
@@ -111,13 +124,13 @@ function normalizeConfig(partial: SessionTimeoutPartialConfig | undefined): Norm
     ...shallow,
     httpActivity: {
       ...base.httpActivity,
-      ...(httpActivity ?? {})
+      ...(httpActivity ?? {}),
     },
     actionDelays: {
       ...base.actionDelays,
-      ...(actionDelays ?? {})
+      ...(actionDelays ?? {}),
     },
-    domActivityEvents: base.domActivityEvents
+    domActivityEvents: base.domActivityEvents,
   };
 
   const invalidDomActivityEvents: string[] = [];

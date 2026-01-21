@@ -1,11 +1,13 @@
 # Sprint Progress
 
 ## Summary
+
 - Date: 2025-10-09
 - Overall status: In Progress
 - Blockers: None
 
 ## Work Items
+
 - cp1-discovery: Done
 - cp2a-config: Done
 - cp2b-coordinator: Done
@@ -34,6 +36,7 @@
 - cp12-packaging-reissue: Done
 
 ## Log
+
 - 2025-10-05 22:51 - Authored cross-tab sync plan including detailed checkpoints/sub-checkpoints; planning records reset for next session continuation.
 - 2025-10-05 22:58 - Completed Checkpoint 1 discovery with design brief, syncMode behaviour matrix, risk & verification outline (`docs/planning/cross-tab-sync-discovery.md`).
 - 2025-10-05 23:09 - Finished CP2a syncMode config/validation updates, updated storage serialization, and added targeted Jest coverage (`npm run test --workspace=ng2-idle-timeout -- --runTestsByPath packages/ng2-idle-timeout/src/lib/validation.spec.ts`).
@@ -89,7 +92,7 @@
 - 2025-10-09 23:40 - Completed CP11 leader diagnostics: exposed leader/follower APIs, updated playground telemetry, refreshed README, and verified targeted Jest suites.
 
 - 2025-10-09 23:55 - Ran full library Jest suite (
-pm run test --workspace=ng2-idle-timeout) after leader diagnostics work; resolved legacy syncMode cleanup to keep configs schema-safe.
+  pm run test --workspace=ng2-idle-timeout) after leader diagnostics work; resolved legacy syncMode cleanup to keep configs schema-safe.
 
 - 2025-10-09 06:13 - Confirmed 0.3.5 publish regression (TS sources without compiled output), reverted the workspace to 0.3.4, rebuilt via ng-packagr, generated npm pack from packages/ng2-idle-timeout/dist, and updated release/publishing guidance.
 - 2025-10-09 06:15 - Attempted to publish 0.3.4 reissue; npm rejected previously published version, transitioning to 0.3.6 republish plan.

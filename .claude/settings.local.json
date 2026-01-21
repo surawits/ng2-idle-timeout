@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx ng-packagr:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx webpack-bundle-analyzer:*)",
+      "Bash(npm run test)",
+      "Bash(code:*)",
+      "Bash(npm run lint)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

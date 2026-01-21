@@ -1,23 +1,23 @@
-import { createSessionTimeoutProviders } from 'ng2-idle-timeout';
-import type { SessionTimeoutPartialConfig } from 'ng2-idle-timeout';
+import { createSessionTimeoutProviders } from "ng2-idle-timeout";
+import type { SessionTimeoutPartialConfig } from "ng2-idle-timeout";
 
 export const defaultSessionTimeoutConfig: SessionTimeoutPartialConfig = {
-  storageKeyPrefix: 'demo-experience',
+  storageKeyPrefix: "demo-experience",
   idleGraceMs: 5000,
   countdownMs: 15000,
   warnBeforeMs: 5000,
-  resumeBehavior: 'autoOnServerSync',
+  resumeBehavior: "autoOnServerSync",
   activityResetCooldownMs: 5000,
   httpActivity: {
     enabled: true,
-    strategy: 'allowlist',
+    strategy: "allowlist",
     allowlist: [/\/api\/demo/],
     denylist: [],
     ignoreOnInitMs: 0,
     cooldownMs: 0,
     onlyWhenTabFocused: false,
-    primaryTabOnly: false
-  }
+    primaryTabOnly: false,
+  },
 };
 
 function buildSessionTimeoutConfig(): SessionTimeoutPartialConfig {
@@ -28,13 +28,17 @@ function buildSessionTimeoutConfig(): SessionTimeoutPartialConfig {
     httpActivity: baseHttpActivity
       ? {
           ...baseHttpActivity,
-          allowlist: baseHttpActivity.allowlist ? [...baseHttpActivity.allowlist] : undefined,
-          denylist: baseHttpActivity.denylist ? [...baseHttpActivity.denylist] : undefined
+          allowlist: baseHttpActivity.allowlist
+            ? [...baseHttpActivity.allowlist]
+            : undefined,
+          denylist: baseHttpActivity.denylist
+            ? [...baseHttpActivity.denylist]
+            : undefined,
         }
-      : undefined
+      : undefined,
   };
 }
 
-export const experienceSessionTimeoutProviders = createSessionTimeoutProviders(buildSessionTimeoutConfig);
-
-
+export const experienceSessionTimeoutProviders = createSessionTimeoutProviders(
+  buildSessionTimeoutConfig,
+);

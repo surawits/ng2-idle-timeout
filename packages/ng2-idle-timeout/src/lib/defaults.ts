@@ -1,14 +1,18 @@
-import type { SessionActionDelays, SessionTimeoutConfig, DomActivityEventName } from './models/session-timeout-config';
+import type {
+  SessionActionDelays,
+  SessionTimeoutConfig,
+  DomActivityEventName,
+} from "./models/session-timeout-config";
 
 export const DEFAULT_HTTP_ACTIVITY = Object.freeze({
   enabled: true,
-  strategy: 'allowlist',
+  strategy: "allowlist",
   allowlist: [/\/(create|update|submit|checkout)/i],
   denylist: [/\/(metrics|prefetch|health|refresh-token)/i],
   ignoreOnInitMs: 3000,
   cooldownMs: 3000,
   onlyWhenTabFocused: true,
-  primaryTabOnly: true
+  primaryTabOnly: true,
 } as const);
 
 export const DEFAULT_ACTION_DELAYS = Object.freeze({
@@ -18,19 +22,19 @@ export const DEFAULT_ACTION_DELAYS = Object.freeze({
   extend: 0,
   pause: 0,
   resume: 0,
-  expire: 0
+  expire: 0,
 } satisfies SessionActionDelays);
 
 export const DEFAULT_DOM_ACTIVITY_EVENTS = Object.freeze([
-  'mousedown',
-  'click',
-  'wheel',
-  'scroll',
-  'keydown',
-  'keyup',
-  'touchstart',
-  'touchend',
-  'visibilitychange'
+  "mousedown",
+  "click",
+  "wheel",
+  "scroll",
+  "keydown",
+  "keyup",
+  "touchstart",
+  "touchend",
+  "visibilitychange",
 ] as const satisfies readonly DomActivityEventName[]);
 
 export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
@@ -39,42 +43,44 @@ export const DEFAULT_SESSION_TIMEOUT_CONFIG: SessionTimeoutConfig = {
   warnBeforeMs: 300_000,
   pollingMs: 500,
   activityResetCooldownMs: 0,
-  storageKeyPrefix: 'ng2-idle-timeout',
+  storageKeyPrefix: "ng2-idle-timeout",
   appInstanceId: undefined,
-  strategy: 'userOnly',
+  strategy: "userOnly",
   httpActivity: {
     ...DEFAULT_HTTP_ACTIVITY,
-    strategy: 'allowlist'
+    strategy: "allowlist",
   },
   actionDelays: {
-    ...DEFAULT_ACTION_DELAYS
+    ...DEFAULT_ACTION_DELAYS,
   },
-  openNewTabBehavior: 'inherit',
+  openNewTabBehavior: "inherit",
   routerCountsAsActivity: true,
   domActivityEvents: DEFAULT_DOM_ACTIVITY_EVENTS,
   debounceMouseMs: 800,
   debounceKeyMs: 200,
   maxExtendPerSession: 0,
-  onExpire: 'emit',
-  timeSource: 'client',
+  onExpire: "emit",
+  timeSource: "client",
   serverTimeEndpoint: undefined,
-  logging: 'warn',
+  logging: "warn",
   resetOnWarningActivity: true,
   ignoreUserActivityWhenPaused: false,
-  allowManualExtendWhenExpired: false
+  allowManualExtendWhenExpired: false,
 };
 
 export const DEFAULT_STORAGE_KEYS = Object.freeze({
-  idleMetadata: 'session',
-  countdown: 'countdown',
-  config: 'config'
+  idleMetadata: "session",
+  countdown: "countdown",
+  config: "config",
 });
 
-export function mergeConfig(partial: Partial<SessionTimeoutConfig> | undefined): SessionTimeoutConfig {
+export function mergeConfig(
+  partial: Partial<SessionTimeoutConfig> | undefined,
+): SessionTimeoutConfig {
   if (!partial) {
     return {
       ...DEFAULT_SESSION_TIMEOUT_CONFIG,
-      domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
+      domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents],
     };
   }
 
@@ -82,12 +88,12 @@ export function mergeConfig(partial: Partial<SessionTimeoutConfig> | undefined):
 
   const mergedHttp = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity,
-    ...(httpActivity ?? {})
+    ...(httpActivity ?? {}),
   };
 
   const mergedDelays: SessionActionDelays = {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG.actionDelays,
-    ...(actionDelays ?? {})
+    ...(actionDelays ?? {}),
   };
 
   const next: SessionTimeoutConfig = {
@@ -96,12 +102,12 @@ export function mergeConfig(partial: Partial<SessionTimeoutConfig> | undefined):
     httpActivity: {
       ...mergedHttp,
       allowlist: mergedHttp.allowlist ?? [],
-      denylist: mergedHttp.denylist ?? []
+      denylist: mergedHttp.denylist ?? [],
     },
     actionDelays: mergedDelays,
     domActivityEvents: Array.isArray(domActivityEvents)
       ? [...domActivityEvents]
-      : [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents]
+      : [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents],
   };
 
   return next;

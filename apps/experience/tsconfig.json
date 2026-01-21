@@ -19,14 +19,9 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "ES2022",
-    "lib": [
-      "ES2022",
-      "dom"
-    ],
+    "lib": ["ES2022", "dom"],
     "paths": {
-      "ng2-idle-timeout": [
-        "../../packages/ng2-idle-timeout/src/public-api"
-      ]
+      "ng2-idle-timeout": ["../../packages/ng2-idle-timeout/src/public-api"]
     }
   },
   "angularCompilerOptions": {

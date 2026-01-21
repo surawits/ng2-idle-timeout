@@ -1,14 +1,20 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed } from "@angular/core/testing";
 
-import { APP_INITIALIZER, ApplicationInitStatus } from '@angular/core';
-import { Subject } from 'rxjs';
+import { APP_INITIALIZER, ApplicationInitStatus } from "@angular/core";
+import { Subject } from "rxjs";
 
-import { SessionTimeoutService } from './services/session-timeout.service';
-import { TimeSourceService } from './services/time-source.service';
-import { SharedStateCoordinatorService } from './services/shared-state-coordinator.service';
-import { createSessionTimeoutProviders, provideSessionTimeout } from './provide-session-timeout';
-import type { SessionTimeoutConfig } from './models/session-timeout-config';
-import type { SharedSessionState, SharedStateMessage } from './models/session-shared-state';
+import { SessionTimeoutService } from "./services/session-timeout.service";
+import { TimeSourceService } from "./services/time-source.service";
+import { SharedStateCoordinatorService } from "./services/shared-state-coordinator.service";
+import {
+  createSessionTimeoutProviders,
+  provideSessionTimeout,
+} from "./provide-session-timeout";
+import type { SessionTimeoutConfig } from "./models/session-timeout-config";
+import type {
+  SharedSessionState,
+  SharedStateMessage,
+} from "./models/session-shared-state";
 
 class StubTimeSourceService {
   private nowValue = Date.now();
@@ -39,12 +45,16 @@ class StubSharedStateCoordinatorService {
     this.currentConfig = config;
   }
 
-  publishState(_state: SharedSessionState, _options?: unknown): void {
+  publishState(state: SharedSessionState, options?: unknown): void {
     // noop for tests
+    void state;
+    void options;
   }
 
-  requestSync(_reason?: string, _expectReply?: boolean): void {
+  requestSync(reason?: string, expectReply?: boolean): void {
     // noop for tests
+    void reason;
+    void expectReply;
   }
 
   readPersistedState(): SharedSessionState | null {
@@ -56,7 +66,7 @@ class StubSharedStateCoordinatorService {
   }
 
   getSourceId(): string {
-    return 'stub-source';
+    return "stub-source";
   }
 
   getConfig(): SessionTimeoutConfig | null {
@@ -68,68 +78,76 @@ class StubSharedStateCoordinatorService {
   }
 }
 
-describe('createSessionTimeoutProviders', () => {
+describe("createSessionTimeoutProviders", () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         ...createSessionTimeoutProviders({
-          storageKeyPrefix: 'spec-app',
+          storageKeyPrefix: "spec-app",
           idleGraceMs: 1000,
           countdownMs: 15000,
-          warnBeforeMs: 5000
+          warnBeforeMs: 5000,
         }),
         { provide: TimeSourceService, useClass: StubTimeSourceService },
-        { provide: SharedStateCoordinatorService, useClass: StubSharedStateCoordinatorService }
-      ]
+        {
+          provide: SharedStateCoordinatorService,
+          useClass: StubSharedStateCoordinatorService,
+        },
+      ],
     });
   });
 
-  it('applies provided config during root injector construction', () => {
+  it("applies provided config during root injector construction", () => {
     const service = TestBed.inject(SessionTimeoutService);
-    const coordinator = TestBed.inject(SharedStateCoordinatorService) as unknown as StubSharedStateCoordinatorService;
+    const coordinator = TestBed.inject(
+      SharedStateCoordinatorService,
+    ) as unknown as StubSharedStateCoordinatorService;
 
     const config = service.getConfig();
-    expect(config.storageKeyPrefix).toBe('spec-app');
+    expect(config.storageKeyPrefix).toBe("spec-app");
     expect(config.countdownMs).toBe(15000);
     expect(config.idleGraceMs).toBe(1000);
-    expect(coordinator.getConfig()?.storageKeyPrefix).toBe('spec-app');
+    expect(coordinator.getConfig()?.storageKeyPrefix).toBe("spec-app");
   });
 });
 
-describe('provideSessionTimeout in NgModule providers', () => {
+describe("provideSessionTimeout in NgModule providers", () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
         provideSessionTimeout(() => ({
-          storageKeyPrefix: 'ngmodule-app',
+          storageKeyPrefix: "ngmodule-app",
           idleGraceMs: 2000,
           countdownMs: 42000,
-          warnBeforeMs: 7000
+          warnBeforeMs: 7000,
         })),
         { provide: TimeSourceService, useClass: StubTimeSourceService },
-        { provide: SharedStateCoordinatorService, useClass: StubSharedStateCoordinatorService }
-      ]
+        {
+          provide: SharedStateCoordinatorService,
+          useClass: StubSharedStateCoordinatorService,
+        },
+      ],
     });
   });
 
-  it('applies provided config when used via NgModule providers array', () => {
+  it("applies provided config when used via NgModule providers array", () => {
     const service = TestBed.inject(SessionTimeoutService);
     const config = service.getConfig();
 
-    expect(config.storageKeyPrefix).toBe('ngmodule-app');
+    expect(config.storageKeyPrefix).toBe("ngmodule-app");
     expect(config.countdownMs).toBe(42000);
     expect(config.idleGraceMs).toBe(2000);
   });
 });
 
-describe('APP_INITIALIZER ordering', () => {
+describe("APP_INITIALIZER ordering", () => {
   beforeEach(() => {
     TestBed.resetTestingModule();
   });
 
-  it('exposes configured values during initialization', async () => {
+  it("exposes configured values during initialization", async () => {
     let configAtInit: SessionTimeoutConfig | null = null;
 
     TestBed.configureTestingModule({
@@ -140,23 +158,26 @@ describe('APP_INITIALIZER ordering', () => {
           useFactory: (service: SessionTimeoutService) => () => {
             configAtInit = service.getConfig();
           },
-          deps: [SessionTimeoutService]
+          deps: [SessionTimeoutService],
         },
         ...createSessionTimeoutProviders({
-          storageKeyPrefix: 'initializer-app',
+          storageKeyPrefix: "initializer-app",
           idleGraceMs: 3000,
           countdownMs: 18000,
-          warnBeforeMs: 6000
+          warnBeforeMs: 6000,
         }),
         { provide: TimeSourceService, useClass: StubTimeSourceService },
-        { provide: SharedStateCoordinatorService, useClass: StubSharedStateCoordinatorService }
-      ]
+        {
+          provide: SharedStateCoordinatorService,
+          useClass: StubSharedStateCoordinatorService,
+        },
+      ],
     });
 
     await TestBed.inject(ApplicationInitStatus).donePromise;
 
     const config = configAtInit as SessionTimeoutConfig | null;
-    expect(config?.storageKeyPrefix).toBe('initializer-app');
+    expect(config?.storageKeyPrefix).toBe("initializer-app");
     expect(config?.countdownMs).toBe(18000);
   });
 });

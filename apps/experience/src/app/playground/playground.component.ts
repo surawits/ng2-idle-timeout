@@ -1,7 +1,7 @@
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, DestroyRef, computed, inject, signal } from "@angular/core";
+import { CommonModule, DatePipe } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import {
   SessionTimeoutService,
   SharedStateCoordinatorService,
@@ -9,8 +9,8 @@ import {
   DEFAULT_SESSION_TIMEOUT_CONFIG,
   type DomActivityEventName,
   type SessionTimeoutConfig,
-  type SharedSessionState
-} from 'ng2-idle-timeout';
+  type SharedSessionState,
+} from "ng2-idle-timeout";
 
 interface EventView {
   type: string;
@@ -38,27 +38,31 @@ const AUTO_START_DELAY_MS = 150;
 const STALE_SHARED_STATE_THRESHOLD_MS = 5000;
 
 @Component({
-  selector: 'experience-playground',
+  selector: "experience-playground",
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, DatePipe],
-  templateUrl: './playground.component.html',
-  styleUrl: './playground.component.scss'
+  templateUrl: "./playground.component.html",
+  styleUrl: "./playground.component.scss",
 })
 export class PlaygroundComponent {
   private readonly sessionTimeout = inject(SessionTimeoutService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly sharedStateCoordinator = inject(SharedStateCoordinatorService);
+  private readonly sharedStateCoordinator = inject(
+    SharedStateCoordinatorService,
+  );
   private readonly initialConfig = this.sessionTimeout.getConfig();
 
   readonly coordinatorSourceId = this.sharedStateCoordinator.getSourceId();
 
   readonly domEventOptions = DOM_ACTIVITY_EVENT_NAMES;
   readonly defaultDomEventSelection = new Set<DomActivityEventName>(
-    DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents
+    DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
   );
-  domEventSelection = new Set<DomActivityEventName>(this.initialConfig.domActivityEvents);
+  domEventSelection = new Set<DomActivityEventName>(
+    this.initialConfig.domActivityEvents,
+  );
 
   readonly observerUrl: string;
   readonly isObserverMode: boolean;
@@ -70,7 +74,7 @@ export class PlaygroundComponent {
   autoResume = true;
   resetOnWarningActivity = this.initialConfig.resetOnWarningActivity;
 
-  readonly heroBadges = ['Real-time events', 'Cross-tab ready', 'Server sync'];
+  readonly heroBadges = ["Real-time events", "Cross-tab ready", "Server sync"];
 
   events: EventView[] = [];
   activityLog: ActivityView[] = [];
@@ -84,7 +88,9 @@ export class PlaygroundComponent {
 
   private readonly configState = signal(this.initialConfig);
 
-  private readonly sharedStateInternal = signal<SharedSessionState | null>(null);
+  private readonly sharedStateInternal = signal<SharedSessionState | null>(
+    null,
+  );
   readonly sharedState = this.sharedStateInternal.asReadonly();
   private autoStartHandle: ReturnType<typeof setTimeout> | null = null;
   private autoStartSuppressed = false;
@@ -100,11 +106,14 @@ export class PlaygroundComponent {
       return [];
     }
     return [
-      { label: 'Operation', value: this.formatOperation(state.metadata.operation) },
-      { label: 'Revision', value: state.metadata.revision.toString() },
-      { label: 'Logical clock', value: state.metadata.logicalClock.toString() },
-      { label: 'Writer ID', value: state.metadata.writerId },
-      { label: 'Causality token', value: state.metadata.causalityToken }
+      {
+        label: "Operation",
+        value: this.formatOperation(state.metadata.operation),
+      },
+      { label: "Revision", value: state.metadata.revision.toString() },
+      { label: "Logical clock", value: state.metadata.logicalClock.toString() },
+      { label: "Writer ID", value: state.metadata.writerId },
+      { label: "Causality token", value: state.metadata.causalityToken },
     ];
   });
 
@@ -114,34 +123,49 @@ export class PlaygroundComponent {
       return [];
     }
     return [
-      { label: 'Revision', value: state.config.revision.toString() },
-      { label: 'Logical clock', value: state.config.logicalClock.toString() },
-      { label: 'Writer ID', value: state.config.writerId }
+      { label: "Revision", value: state.config.revision.toString() },
+      { label: "Logical clock", value: state.config.logicalClock.toString() },
+      { label: "Writer ID", value: state.config.writerId },
     ];
   });
 
   readonly observerConfigRows = computed<MetadataItem[]>(() => {
     const config = this.configState();
     return [
-      { label: 'Idle grace', value: Math.round(config.idleGraceMs / 1000) + ' s' },
-      { label: 'Countdown', value: Math.round(config.countdownMs / 1000) + ' s' },
-      { label: 'Warn before expiry', value: Math.round(config.warnBeforeMs / 1000) + ' s' },
-      { label: 'Activity cooldown', value: Math.round(config.activityResetCooldownMs / 1000) + ' s' },
       {
-        label: 'Auto resume',
-        value: config.resumeBehavior === 'manual' ? 'Disabled' : 'autoOnServerSync'
+        label: "Idle grace",
+        value: Math.round(config.idleGraceMs / 1000) + " s",
       },
       {
-        label: 'Reset on warning activity',
-        value: config.resetOnWarningActivity ? 'Enabled' : 'Disabled'
+        label: "Countdown",
+        value: Math.round(config.countdownMs / 1000) + " s",
       },
       {
-        label: 'DOM events',
+        label: "Warn before expiry",
+        value: Math.round(config.warnBeforeMs / 1000) + " s",
+      },
+      {
+        label: "Activity cooldown",
+        value: Math.round(config.activityResetCooldownMs / 1000) + " s",
+      },
+      {
+        label: "Auto resume",
+        value:
+          config.resumeBehavior === "manual" ? "Disabled" : "autoOnServerSync",
+      },
+      {
+        label: "Reset on warning activity",
+        value: config.resetOnWarningActivity ? "Enabled" : "Disabled",
+      },
+      {
+        label: "DOM events",
         value:
           config.domActivityEvents.length > 0
-            ? config.domActivityEvents.map(event => this.domEventLabel(event)).join(', ')
-            : 'None'
-      }
+            ? config.domActivityEvents
+                .map((event) => this.domEventLabel(event))
+                .join(", ")
+            : "None",
+      },
     ];
   });
 
@@ -153,7 +177,7 @@ export class PlaygroundComponent {
     return {
       id: state.leader.id,
       heartbeatAt: state.leader.heartbeatAt,
-      epoch: state.leader.epoch
+      epoch: state.leader.epoch,
     };
   });
 
@@ -162,27 +186,29 @@ export class PlaygroundComponent {
 
   readonly leaderRoleLabel = computed(() => {
     const role = this.leaderRoleInternal();
-    if (role === 'leader') {
-      return 'Leader';
+    if (role === "leader") {
+      return "Leader";
     }
-    if (role === 'follower') {
-      return 'Follower';
+    if (role === "follower") {
+      return "Follower";
     }
-    return 'No leader yet';
+    return "No leader yet";
   });
 
   readonly leaderRoleBadgeClass = computed(() => {
     const role = this.leaderRoleInternal();
-    if (role === 'leader') {
-      return 'text-bg-primary';
+    if (role === "leader") {
+      return "text-bg-primary";
     }
-    if (role === 'follower') {
-      return 'text-bg-info text-dark';
+    if (role === "follower") {
+      return "text-bg-info text-dark";
     }
-    return 'text-bg-light text-dark';
+    return "text-bg-light text-dark";
   });
 
-  readonly canEditConfig = computed(() => this.leaderRoleInternal() !== 'follower');
+  readonly canEditConfig = computed(
+    () => this.leaderRoleInternal() !== "follower",
+  );
 
   readonly leaderDetails = computed(() => {
     const state = this.leaderState();
@@ -192,7 +218,7 @@ export class PlaygroundComponent {
     return {
       id: state.leaderId,
       epoch: state.leader?.epoch ?? null,
-      heartbeatAt: state.leader?.heartbeatAt ?? null
+      heartbeatAt: state.leader?.heartbeatAt ?? null,
     };
   });
 
@@ -209,46 +235,64 @@ export class PlaygroundComponent {
     const shared = this.sharedState();
     return shared ? shared.snapshot.idleStartAt != null : false;
   });
-  readonly isSessionPaused = computed(() => this.isSessionActive() && this.snapshot().paused);
-  readonly isWarnState = computed(() => this.isSessionActive() && this.sessionState() === 'WARN');
-  readonly visibleSessionState = computed(() => (this.isSessionActive() ? this.sessionState() : 'Stopped'));
+  readonly isSessionPaused = computed(
+    () => this.isSessionActive() && this.snapshot().paused,
+  );
+  readonly isWarnState = computed(
+    () => this.isSessionActive() && this.sessionState() === "WARN",
+  );
+  readonly visibleSessionState = computed(() =>
+    this.isSessionActive() ? this.sessionState() : "Stopped",
+  );
 
   readonly sessionBadgeClass = computed(() => {
     if (!this.isSessionActive()) {
-      return 'text-bg-secondary';
+      return "text-bg-secondary";
     }
     const state = this.sessionState();
-    if (state === 'EXPIRED') {
-      return 'text-bg-danger';
+    if (state === "EXPIRED") {
+      return "text-bg-danger";
     }
-    if (state === 'WARN') {
-      return 'text-bg-warning text-dark';
+    if (state === "WARN") {
+      return "text-bg-warning text-dark";
     }
-    return 'text-bg-success';
+    return "text-bg-success";
   });
 
   readonly idleRemainingSeconds = computed(() => {
-    return Math.max(0, Math.ceil(this.sessionTimeout.idleRemainingMsSignal() / 1000));
+    return Math.max(
+      0,
+      Math.ceil(this.sessionTimeout.idleRemainingMsSignal() / 1000),
+    );
   });
 
   readonly countdownRemainingSeconds = computed(() => {
-    return Math.max(0, Math.ceil(this.sessionTimeout.countdownRemainingMsSignal() / 1000));
+    return Math.max(
+      0,
+      Math.ceil(this.sessionTimeout.countdownRemainingMsSignal() / 1000),
+    );
   });
 
   readonly activityCooldownRemainingSeconds = computed(() => {
-    return Math.max(0, Math.ceil(this.sessionTimeout.activityCooldownRemainingMsSignal() / 1000));
+    return Math.max(
+      0,
+      Math.ceil(this.sessionTimeout.activityCooldownRemainingMsSignal() / 1000),
+    );
   });
 
   readonly totalRemainingSeconds = computed(() => {
-    return Math.max(0, Math.ceil(this.sessionTimeout.totalRemainingMsSignal() / 1000));
+    return Math.max(
+      0,
+      Math.ceil(this.sessionTimeout.totalRemainingMsSignal() / 1000),
+    );
   });
 
   readonly warningModalCountdownSeconds = computed(() => {
     const state = this.sessionTimeout.stateSignal();
-    if (state === 'WARN' || state === 'EXPIRED' || state === 'IDLE') {
+    if (state === "WARN" || state === "EXPIRED" || state === "IDLE") {
       return 0;
     }
-    if (state === 'COUNTDOWN') {
+    if (state === "COUNTDOWN") {
       const remainingMs = this.sessionTimeout.countdownRemainingMsSignal();
       const warnBeforeMs = this.configState().warnBeforeMs;
       if (remainingMs <= warnBeforeMs) {
@@ -276,8 +320,11 @@ export class PlaygroundComponent {
   });
 
   constructor() {
-    this.isObserverMode = this.route.snapshot.queryParamMap.get('observer') === '1';
-    this.observerUrl = this.router.serializeUrl(this.router.createUrlTree([], { queryParams: { observer: '1' } }));
+    this.isObserverMode =
+      this.route.snapshot.queryParamMap.get("observer") === "1";
+    this.observerUrl = this.router.serializeUrl(
+      this.router.createUrlTree([], { queryParams: { observer: "1" } }),
+    );
 
     this.applyConfig();
     this.sessionTimeout.stop();
@@ -289,19 +336,21 @@ export class PlaygroundComponent {
       this.scheduleAutoStart();
     }
 
-    const sharedStateSub = this.sharedStateCoordinator.updates$.subscribe(message => {
-      if (message.type === 'state') {
-        this.handleSharedStateSnapshot(message.state);
-      }
-    });
+    const sharedStateSub = this.sharedStateCoordinator.updates$.subscribe(
+      (message) => {
+        if (message.type === "state") {
+          this.handleSharedStateSnapshot(message.state);
+        }
+      },
+    );
 
-    const eventsSub = this.sessionTimeout.events$.subscribe(event => {
-      if (event.type === 'ConfigChanged') {
+    const eventsSub = this.sessionTimeout.events$.subscribe((event) => {
+      if (event.type === "ConfigChanged") {
         this.syncLocalConfigInputs(this.sessionTimeout.getConfig());
       }
-      if (event.type === 'Started') {
+      if (event.type === "Started") {
         this.serviceActive.set(true);
-      } else if (event.type === 'Stopped') {
+      } else if (event.type === "Stopped") {
         this.serviceActive.set(false);
       }
 
@@ -311,14 +360,17 @@ export class PlaygroundComponent {
         state: event.state,
         at: event.at,
         timeLabel: new Date(event.at).toLocaleTimeString(),
-        remainingSeconds: Math.max(0, Math.floor((event.snapshot?.remainingMs ?? 0) / 1000)),
-        metaSummary
+        remainingSeconds: Math.max(
+          0,
+          Math.floor((event.snapshot?.remainingMs ?? 0) / 1000),
+        ),
+        metaSummary,
       };
       this.events = [view, ...this.events].slice(0, 50);
       this.eventPage = 0;
     });
 
-    const activitySub = this.sessionTimeout.activity$.subscribe(activity => {
+    const activitySub = this.sessionTimeout.activity$.subscribe((activity) => {
       if (!this.serviceActive()) {
         return;
       }
@@ -345,9 +397,9 @@ export class PlaygroundComponent {
       countdownMs: this.countdownSeconds * 1000,
       warnBeforeMs: this.warnBeforeSeconds * 1000,
       activityResetCooldownMs: this.activityCooldownSeconds * 1000,
-      resumeBehavior: this.autoResume ? 'autoOnServerSync' : 'manual',
+      resumeBehavior: this.autoResume ? "autoOnServerSync" : "manual",
       resetOnWarningActivity: this.resetOnWarningActivity,
-      domActivityEvents
+      domActivityEvents,
     });
     const nextConfig = this.sessionTimeout.getConfig();
     this.syncLocalConfigInputs(nextConfig);
@@ -377,7 +429,7 @@ export class PlaygroundComponent {
   }
 
   requestSharedStateSync(reason?: string): void {
-    this.sharedStateCoordinator.requestSync(reason ?? 'playground');
+    this.sharedStateCoordinator.requestSync(reason ?? "playground");
   }
 
   refreshSharedStateSnapshot(): void {
@@ -392,28 +444,28 @@ export class PlaygroundComponent {
 
   domEventLabel(event: DomActivityEventName): string {
     switch (event) {
-      case 'mousemove':
-        return 'Mouse move';
-      case 'mousedown':
-        return 'Mouse down';
-      case 'click':
-        return 'Click';
-      case 'wheel':
-        return 'Wheel';
-      case 'scroll':
-        return 'Scroll';
-      case 'keydown':
-        return 'Key down';
-      case 'keyup':
-        return 'Key up';
-      case 'touchstart':
-        return 'Touch start';
-      case 'touchend':
-        return 'Touch end';
-      case 'touchmove':
-        return 'Touch move';
-      case 'visibilitychange':
-        return 'Visibility change';
+      case "mousemove":
+        return "Mouse move";
+      case "mousedown":
+        return "Mouse down";
+      case "click":
+        return "Click";
+      case "wheel":
+        return "Wheel";
+      case "scroll":
+        return "Scroll";
+      case "keydown":
+        return "Key down";
+      case "keyup":
+        return "Key up";
+      case "touchstart":
+        return "Touch start";
+      case "touchend":
+        return "Touch end";
+      case "touchmove":
+        return "Touch move";
+      case "visibilitychange":
+        return "Visibility change";
       default:
         return event;
     }
@@ -428,23 +480,34 @@ export class PlaygroundComponent {
     this.idleGraceSeconds = Math.round(config.idleGraceMs / 1000);
     this.countdownSeconds = Math.round(config.countdownMs / 1000);
     this.warnBeforeSeconds = Math.round(config.warnBeforeMs / 1000);
-    this.activityCooldownSeconds = Math.round(config.activityResetCooldownMs / 1000);
-    this.autoResume = config.resumeBehavior !== 'manual';
+    this.activityCooldownSeconds = Math.round(
+      config.activityResetCooldownMs / 1000,
+    );
+    this.autoResume = config.resumeBehavior !== "manual";
     this.resetOnWarningActivity = config.resetOnWarningActivity;
-    this.domEventSelection = new Set<DomActivityEventName>(config.domActivityEvents);
+    this.domEventSelection = new Set<DomActivityEventName>(
+      config.domActivityEvents,
+    );
   }
 
   private currentDomActivityEvents(): DomActivityEventName[] {
-    return this.domEventOptions.filter(option => this.domEventSelection.has(option));
+    return this.domEventOptions.filter((option) =>
+      this.domEventSelection.has(option),
+    );
   }
 
   private handleSharedStateSnapshot(state: SharedSessionState): void {
     this.sharedStateInternal.set(state);
     if (this.isObserverMode) {
-      if (typeof queueMicrotask === 'function') {
-        queueMicrotask(() => this.syncLocalConfigInputs(this.sessionTimeout.getConfig()));
+      if (typeof queueMicrotask === "function") {
+        queueMicrotask(() =>
+          this.syncLocalConfigInputs(this.sessionTimeout.getConfig()),
+        );
       } else {
-        setTimeout(() => this.syncLocalConfigInputs(this.sessionTimeout.getConfig()), 0);
+        setTimeout(
+          () => this.syncLocalConfigInputs(this.sessionTimeout.getConfig()),
+          0,
+        );
       }
       return;
     }
@@ -570,14 +633,14 @@ export class PlaygroundComponent {
     if (!this.serviceActive()) {
       return;
     }
-    this.sessionTimeout.extend({ source: 'playground' });
+    this.sessionTimeout.extend({ source: "playground" });
   }
 
   staySignedIn(): void {
     if (this.isObserverMode) {
       return;
     }
-    this.resetIdle('manual');
+    this.resetIdle("manual");
   }
 
   expireSession(): void {
@@ -587,10 +650,10 @@ export class PlaygroundComponent {
     if (!this.serviceActive()) {
       return;
     }
-    this.sessionTimeout.expireNow({ source: 'playgroundModal' });
+    this.sessionTimeout.expireNow({ source: "playgroundModal" });
   }
 
-  resetIdle(source: 'dom' | 'http' | 'manual'): void {
+  resetIdle(source: "dom" | "http" | "manual"): void {
     if (this.isObserverMode) {
       return;
     }
@@ -607,16 +670,21 @@ export class PlaygroundComponent {
     if (!this.serviceActive()) {
       return;
     }
-    const handler = (this.sessionTimeout as unknown as { handleServerSync?: () => void }).handleServerSync;
+    const handler = (
+      this.sessionTimeout as unknown as { handleServerSync?: () => void }
+    ).handleServerSync;
     handler?.call(this.sessionTimeout);
   }
 
   navigateToDocs(): void {
-    void this.router.navigate(['/docs']);
+    void this.router.navigate(["/docs"]);
   }
 
   get eventPageCount(): number {
-    return Math.max(1, Math.ceil(this.events.length / this.eventsPageSize) || 1);
+    return Math.max(
+      1,
+      Math.ceil(this.events.length / this.eventsPageSize) || 1,
+    );
   }
 
   get pagedEvents(): EventView[] {
@@ -625,7 +693,10 @@ export class PlaygroundComponent {
   }
 
   get activityPageCount(): number {
-    return Math.max(1, Math.ceil(this.activityLog.length / this.activityPageSize) || 1);
+    return Math.max(
+      1,
+      Math.ceil(this.activityLog.length / this.activityPageSize) || 1,
+    );
   }
 
   get pagedActivity(): ActivityView[] {
@@ -648,70 +719,84 @@ export class PlaygroundComponent {
     if (this.activityLog.length === 0) {
       return;
     }
-    this.activityPage = Math.min(this.activityPage + 1, this.activityPageCount - 1);
+    this.activityPage = Math.min(
+      this.activityPage + 1,
+      this.activityPageCount - 1,
+    );
   }
 
   prevActivityPage(): void {
     this.activityPage = Math.max(0, this.activityPage - 1);
   }
 
-  private summariseMeta(meta: Record<string, unknown> | undefined): string | undefined {
+  private summariseMeta(
+    meta: Record<string, unknown> | undefined,
+  ): string | undefined {
     if (!meta) {
       return undefined;
     }
     const entries = Object.entries(meta)
       .filter(
         ([key, value]) =>
-          key !== 'activitySource' &&
-          key !== 'type' &&
-          key !== 'resetSuppressed' &&
-          key !== 'resetSuppressedReason' &&
+          key !== "activitySource" &&
+          key !== "type" &&
+          key !== "resetSuppressed" &&
+          key !== "resetSuppressedReason" &&
           value !== undefined &&
           value !== null &&
-          value !== ''
+          value !== "",
       )
-      .map(([key, value]) => key + ': ' + String(value));
-    return entries.length > 0 ? entries.join(', ') : undefined;
+      .map(([key, value]) => key + ": " + String(value));
+    return entries.length > 0 ? entries.join(", ") : undefined;
   }
 
-  private formatActivity(activity: { source: string; at: number; meta?: Record<string, unknown> }): ActivityView {
+  private formatActivity(activity: {
+    source: string;
+    at: number;
+    meta?: Record<string, unknown>;
+  }): ActivityView {
     const meta = activity.meta ?? {};
-    const rawType = meta['type'];
-    const type = typeof rawType === 'string' ? rawType : activity.source;
+    const rawType = meta["type"];
+    const type = typeof rawType === "string" ? rawType : activity.source;
     const detailEntries = Object.entries(meta)
       .filter(
         ([key, value]) =>
-          key !== 'type' &&
-          key !== 'activitySource' &&
-          key !== 'resetSuppressed' &&
-          key !== 'resetSuppressedReason' &&
+          key !== "type" &&
+          key !== "activitySource" &&
+          key !== "resetSuppressed" &&
+          key !== "resetSuppressedReason" &&
           value !== undefined &&
           value !== null &&
-          value !== ''
+          value !== "",
       )
-      .map(([key, value]) => key + ': ' + String(value));
+      .map(([key, value]) => key + ": " + String(value));
 
-    let summary = type === activity.source ? activity.source : activity.source + ' -> ' + type;
-    if (meta['resetSuppressed'] === true) {
+    let summary =
+      type === activity.source
+        ? activity.source
+        : activity.source + " -> " + type;
+    if (meta["resetSuppressed"] === true) {
       const reason =
-        typeof meta['resetSuppressedReason'] === 'string' ? meta['resetSuppressedReason'] : 'suppressed';
-      summary += ' (suppressed: ' + reason + ')';
+        typeof meta["resetSuppressedReason"] === "string"
+          ? meta["resetSuppressedReason"]
+          : "suppressed";
+      summary += " (suppressed: " + reason + ")";
     }
 
     return {
       at: activity.at,
       source: activity.source,
       summary,
-      detail: detailEntries.length > 0 ? detailEntries.join(', ') : undefined
+      detail: detailEntries.length > 0 ? detailEntries.join(", ") : undefined,
     };
   }
 
-  private formatOperation(operation: SharedSessionState['metadata']['operation']): string {
+  private formatOperation(
+    operation: SharedSessionState["metadata"]["operation"],
+  ): string {
     return operation
-      .split('-')
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ');
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
   }
 }
-
-

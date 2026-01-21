@@ -1,4 +1,4 @@
-﻿import { HttpContextToken } from '@angular/common/http';
+﻿import { HttpContextToken } from "@angular/common/http";
 
 const tokenRegistry = new Map<string, HttpContextToken<boolean>>();
 
@@ -6,7 +6,9 @@ const tokenRegistry = new Map<string, HttpContextToken<boolean>>();
  * Retrieve (or lazily create) a shared HttpContextToken used to flag a request
  * as session activity.
  */
-export function getSessionActivityContextToken(name: string): HttpContextToken<boolean> {
+export function getSessionActivityContextToken(
+  name: string,
+): HttpContextToken<boolean> {
   let token = tokenRegistry.get(name);
   if (!token) {
     token = new HttpContextToken<boolean>(() => false);

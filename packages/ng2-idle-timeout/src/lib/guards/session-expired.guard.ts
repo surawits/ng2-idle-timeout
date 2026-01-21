@@ -1,8 +1,12 @@
-﻿import { inject } from '@angular/core';
-import type { CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+﻿import { inject } from "@angular/core";
+import type {
+  CanActivateFn,
+  ActivatedRouteSnapshot,
+  RouterStateSnapshot,
+} from "@angular/router";
 
-import type { SessionTimeoutPartialConfig } from '../models/session-timeout-config';
-import { SessionTimeoutService } from '../services/session-timeout.service';
+import type { SessionTimeoutPartialConfig } from "../models/session-timeout-config";
+import { SessionTimeoutService } from "../services/session-timeout.service";
 
 export interface SessionTimeoutRouteConfig {
   config?: SessionTimeoutPartialConfig;
@@ -10,11 +14,16 @@ export interface SessionTimeoutRouteConfig {
   autoResume?: boolean;
 }
 
-export const SESSION_TIMEOUT_ROUTE_KEY = 'sessionTimeout';
+export const SESSION_TIMEOUT_ROUTE_KEY = "sessionTimeout";
 
-export const SessionExpiredGuard: CanActivateFn = (route: ActivatedRouteSnapshot, _state: RouterStateSnapshot) => {
+export const SessionExpiredGuard: CanActivateFn = (
+  route: ActivatedRouteSnapshot,
+  _state: RouterStateSnapshot,
+) => {
   const sessionTimeout = inject(SessionTimeoutService);
-  const override = route.data?.[SESSION_TIMEOUT_ROUTE_KEY] as SessionTimeoutRouteConfig | undefined;
+  const override = route.data?.[SESSION_TIMEOUT_ROUTE_KEY] as
+    | SessionTimeoutRouteConfig
+    | undefined;
   void _state;
 
   if (override?.config) {
@@ -27,7 +36,7 @@ export const SessionExpiredGuard: CanActivateFn = (route: ActivatedRouteSnapshot
     sessionTimeout.resume();
   }
 
-  if (snapshot.state === 'EXPIRED' && !override?.allowWhenExpired) {
+  if (snapshot.state === "EXPIRED" && !override?.allowWhenExpired) {
     return false;
   }
 

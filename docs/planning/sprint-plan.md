@@ -1,19 +1,23 @@
 # Sprint Plan
 
 ## Goal
+
 - Implement cross-tab timer and configuration synchronization with leader coordination (distributed mode ultimately removed in CP9f) ensuring consistent state across tabs.
 
 ## Scope
+
 - Redesign shared state persistence and broadcast flow to support leader and distributed coordination modes.
 - Refactor SessionTimeoutService and related helpers for authoritative shared state, join/leave recovery, and system sleep/visibility handling.
 - Provide comprehensive automated tests and playground scenarios that validate multi-tab consistency, failover, and reset behaviours.
 - Update documentation and migration guidance covering the new configuration surface and behaviour changes.
 
 ## Timeline
+
 - Kickoff: 2025-10-05
 - Target completion: 2025-10-19
 
 ## Checkpoints
+
 - [x] Checkpoint 1 – Discovery & Design Notes
   - Deliverables: architectural brief, behaviour matrix for syncMode, risk log, verification outline (`docs/planning/cross-tab-sync-discovery.md`).
 - [x] Checkpoint 2 – Shared State Foundations
@@ -35,14 +39,14 @@
   - Deliverables: multi-tab demo controls, manual validation script, optional smoke tests.
 - [x] Checkpoint 6 - Documentation, Migration, Verification (Done)
   - Deliverables: README updates, migration notes, release notes, verification log, planning sync.
-- [ ] Checkpoint 8 - Warning Activity Reset Option
+- [x] Checkpoint 8 - Warning Activity Reset Option
   - Sub-checkpoints:
     - [x] 8a Config surface updates for `resetOnWarningActivity` (models, defaults, validation, persistence, shared state).
     - [x] 8b SessionTimeoutService activity handling and priority rules.
     - [x] 8c Unit & integration coverage for DOM/HTTP activity across flag states.
     - [x] 8d Documentation, migration notes, and playground toggle.
     - [x] 8e Verification runs and planning record sync.
-- [ ] Checkpoint 9 – Post-Release Bugfixes
+- [x] Checkpoint 9 – Post-Release Bugfixes
   - Sub-checkpoints:
     - [x] 9a Reproduce global config injection regression.
     - [x] 9b Patch root injector config flow and add guardrails.
@@ -52,16 +56,14 @@
     - [x] 9f Remove distributed mode (service, coordinator, docs, playground).
 - [x] Checkpoint 10 – Playground Deployment Automation
   - Deliverables: GitHub Pages workflow building `apps/experience`, automated artifact upload, deployment documentation updates.
-- [x] Checkpoint 11 � Leader Diagnostics & Docs
+- [x] Checkpoint 11 � Leader Diagnostics & Docs
   - Deliverables: leader/follower API surface, playground telemetry updates, README examples, automated coverage.
 
 ## Risks & Assumptions
+
 - Broadcast/storage APIs available in targeted browsers; fallbacks validated.
 - Time source differences reconciled via coordinator metadata.
 - Existing consumers prepared for potential breaking changes.
-
-
-
 
 - [x] Checkpoint 12 - Package Reissue 0.3.4
   - Sub-checkpoints:

@@ -1,17 +1,23 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed } from "@angular/core/testing";
 
-import { ActivityDomService } from './activity-dom.service';
-import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
+import { ActivityDomService } from "./activity-dom.service";
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from "../defaults";
 import {
   DOM_ACTIVITY_EVENT_NAMES,
   type DomActivityEventName,
-  type SessionTimeoutConfig
-} from '../models/session-timeout-config';
+  type SessionTimeoutConfig,
+} from "../models/session-timeout-config";
 
-function buildConfig(overrides: Partial<SessionTimeoutConfig> = {}): SessionTimeoutConfig {
-  const httpOverrides: Partial<SessionTimeoutConfig['httpActivity']> = overrides.httpActivity ?? {};
-  const actionOverrides: Partial<SessionTimeoutConfig['actionDelays']> = overrides.actionDelays ?? {};
-  const domEvents = overrides.domActivityEvents ?? DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents;
+function buildConfig(
+  overrides: Partial<SessionTimeoutConfig> = {},
+): SessionTimeoutConfig {
+  const httpOverrides: Partial<SessionTimeoutConfig["httpActivity"]> =
+    overrides.httpActivity ?? {};
+  const actionOverrides: Partial<SessionTimeoutConfig["actionDelays"]> =
+    overrides.actionDelays ?? {};
+  const domEvents =
+    overrides.domActivityEvents ??
+    DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents;
 
   return {
     ...DEFAULT_SESSION_TIMEOUT_CONFIG,
@@ -19,69 +25,79 @@ function buildConfig(overrides: Partial<SessionTimeoutConfig> = {}): SessionTime
     httpActivity: {
       ...DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity,
       ...httpOverrides,
-      allowlist: [...(httpOverrides.allowlist ?? DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity.allowlist)],
-      denylist: [...(httpOverrides.denylist ?? DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity.denylist)]
+      allowlist: [
+        ...(httpOverrides.allowlist ??
+          DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity.allowlist),
+      ],
+      denylist: [
+        ...(httpOverrides.denylist ??
+          DEFAULT_SESSION_TIMEOUT_CONFIG.httpActivity.denylist),
+      ],
     },
     actionDelays: {
       ...DEFAULT_SESSION_TIMEOUT_CONFIG.actionDelays,
-      ...actionOverrides
+      ...actionOverrides,
     },
-    domActivityEvents: [...domEvents]
+    domActivityEvents: [...domEvents],
   };
 }
 
 const MOUSE_EVENTS = new Set<DomActivityEventName>([
-  'mousemove',
-  'mousedown',
-  'click',
-  'wheel',
-  'scroll',
-  'touchstart',
-  'touchend',
-  'touchmove'
+  "mousemove",
+  "mousedown",
+  "click",
+  "wheel",
+  "scroll",
+  "touchstart",
+  "touchend",
+  "touchmove",
 ]);
 
-const KEY_EVENTS = new Set<DomActivityEventName>(['keydown', 'keyup']);
+const KEY_EVENTS = new Set<DomActivityEventName>(["keydown", "keyup"]);
 
 function createSyntheticEvent(type: DomActivityEventName): Event {
   const eventInit: EventInit = { bubbles: true, cancelable: true };
   switch (type) {
-    case 'mousemove':
-    case 'mousedown':
-    case 'click':
+    case "mousemove":
+    case "mousedown":
+    case "click":
       return new MouseEvent(type, eventInit);
-    case 'wheel':
-      return typeof WheelEvent === 'function' ? new WheelEvent(type, eventInit) : new Event(type, eventInit);
-    case 'scroll':
+    case "wheel":
+      return typeof WheelEvent === "function"
+        ? new WheelEvent(type, eventInit)
+        : new Event(type, eventInit);
+    case "scroll":
       return new Event(type, eventInit);
-    case 'keydown':
-    case 'keyup':
+    case "keydown":
+    case "keyup":
       return new KeyboardEvent(type, { bubbles: true, cancelable: true });
-    case 'touchstart':
-    case 'touchend':
-    case 'touchmove':
-      if (typeof TouchEvent === 'function') {
+    case "touchstart":
+    case "touchend":
+    case "touchmove":
+      if (typeof TouchEvent === "function") {
         return new TouchEvent(type, eventInit as unknown as TouchEventInit);
       }
       return new Event(type, eventInit);
-    case 'visibilitychange':
+    case "visibilitychange":
       return new Event(type, eventInit);
     default:
       return new Event(type, eventInit);
   }
 }
 
-function getDebounceKind(eventName: DomActivityEventName): 'mouse' | 'key' | 'none' {
+function getDebounceKind(
+  eventName: DomActivityEventName,
+): "mouse" | "key" | "none" {
   if (MOUSE_EVENTS.has(eventName)) {
-    return 'mouse';
+    return "mouse";
   }
   if (KEY_EVENTS.has(eventName)) {
-    return 'key';
+    return "key";
   }
-  return 'none';
+  return "none";
 }
 
-describe('ActivityDomService', () => {
+describe("ActivityDomService", () => {
   let service: ActivityDomService;
   let currentTime: number;
 
@@ -107,26 +123,37 @@ describe('ActivityDomService', () => {
   function emitThroughHandle(eventName: DomActivityEventName): void {
     const debounce = getDebounceKind(eventName);
     const event = createSyntheticEvent(eventName);
-    (service as unknown as { handleEvent(event: Event, debounce: 'mouse' | 'key' | 'none'): void }).handleEvent(
-      event,
-      debounce
-    );
+    (
+      service as unknown as {
+        handleEvent(event: Event, debounce: "mouse" | "key" | "none"): void;
+      }
+    ).handleEvent(event, debounce);
   }
 
-  it('registers listeners matching the configured include list', () => {
-    const listenerMap = (service as unknown as { listenerCleanupByEvent: Map<string, unknown> }).listenerCleanupByEvent;
-    expect(new Set(listenerMap.keys())).toEqual(new Set(DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents));
+  it("registers listeners matching the configured include list", () => {
+    const listenerMap = (
+      service as unknown as { listenerCleanupByEvent: Map<string, unknown> }
+    ).listenerCleanupByEvent;
+    expect(new Set(listenerMap.keys())).toEqual(
+      new Set(DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents),
+    );
 
-    const customConfig = buildConfig({ domActivityEvents: ['mousemove', 'keydown', 'visibilitychange'] });
+    const customConfig = buildConfig({
+      domActivityEvents: ["mousemove", "keydown", "visibilitychange"],
+    });
     service.updateConfig(customConfig);
 
-    const afterUpdate = (service as unknown as { listenerCleanupByEvent: Map<string, unknown> }).listenerCleanupByEvent;
-    expect(new Set(afterUpdate.keys())).toEqual(new Set(customConfig.domActivityEvents));
+    const afterUpdate = (
+      service as unknown as { listenerCleanupByEvent: Map<string, unknown> }
+    ).listenerCleanupByEvent;
+    expect(new Set(afterUpdate.keys())).toEqual(
+      new Set(customConfig.domActivityEvents),
+    );
   });
 
-  it('emits activity events for configured DOM names and respects debounce windows', () => {
+  it("emits activity events for configured DOM names and respects debounce windows", () => {
     const events: string[] = [];
-    const sub = service.events$.subscribe(activity => {
+    const sub = service.events$.subscribe((activity) => {
       events.push(activity.meta?.type as string);
     });
 
@@ -162,20 +189,29 @@ describe('ActivityDomService', () => {
     sub.unsubscribe();
   });
 
-  it('reconfigures listeners without recreating the service instance', () => {
-    const baseMap = (service as unknown as { listenerCleanupByEvent: Map<string, unknown> }).listenerCleanupByEvent;
-    expect(baseMap.has('mousemove')).toBe(false);
+  it("reconfigures listeners without recreating the service instance", () => {
+    const baseMap = (
+      service as unknown as { listenerCleanupByEvent: Map<string, unknown> }
+    ).listenerCleanupByEvent;
+    expect(baseMap.has("mousemove")).toBe(false);
 
     const enabledConfig = buildConfig({
-      domActivityEvents: [...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents, 'mousemove']
+      domActivityEvents: [
+        ...DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
+        "mousemove",
+      ],
     });
     service.updateConfig(enabledConfig);
 
-    const afterEnable = (service as unknown as { listenerCleanupByEvent: Map<string, unknown> }).listenerCleanupByEvent;
-    expect(afterEnable.has('mousemove')).toBe(true);
+    const afterEnable = (
+      service as unknown as { listenerCleanupByEvent: Map<string, unknown> }
+    ).listenerCleanupByEvent;
+    expect(afterEnable.has("mousemove")).toBe(true);
 
     service.updateConfig(buildConfig());
-    const afterDisable = (service as unknown as { listenerCleanupByEvent: Map<string, unknown> }).listenerCleanupByEvent;
-    expect(afterDisable.has('mousemove')).toBe(false);
+    const afterDisable = (
+      service as unknown as { listenerCleanupByEvent: Map<string, unknown> }
+    ).listenerCleanupByEvent;
+    expect(afterDisable.has("mousemove")).toBe(false);
   });
 });

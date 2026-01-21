@@ -1,21 +1,24 @@
-import { TestBed } from '@angular/core/testing';
-import { Subject } from 'rxjs';
-import type { SessionSnapshot } from '../models/session-state';
-import type { SessionTimeoutConfig } from '../models/session-timeout-config';
-import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
-import type { CrossTabMessage } from '../models/cross-tab-message';
+import { TestBed } from "@angular/core/testing";
+import { Subject } from "rxjs";
+import type { SessionSnapshot } from "../models/session-state";
+import type { SessionTimeoutConfig } from "../models/session-timeout-config";
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from "../defaults";
+import type { CrossTabMessage } from "../models/cross-tab-message";
 import {
   SHARED_STATE_VERSION,
   type SharedSessionState,
-  type SharedStateMessage
-} from '../models/session-shared-state';
-import type { BroadcastAdapter } from '../utils/broadcast-channel';
-import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
-import { SessionTimeoutService } from './session-timeout.service';
-import { LeaderElectionService, LEADER_TTL_MS } from './leader-election.service';
-import { SharedStateCoordinatorService } from './shared-state-coordinator.service';
-import { TimeSourceService } from './time-source.service';
-import { ServerTimeService } from './server-time.service';
+  type SharedStateMessage,
+} from "../models/session-shared-state";
+import type { BroadcastAdapter } from "../utils/broadcast-channel";
+import { SESSION_TIMEOUT_CONFIG } from "../tokens/config.token";
+import { SessionTimeoutService } from "./session-timeout.service";
+import {
+  LeaderElectionService,
+  LEADER_TTL_MS,
+} from "./leader-election.service";
+import { SharedStateCoordinatorService } from "./shared-state-coordinator.service";
+import { TimeSourceService } from "./time-source.service";
+import { ServerTimeService } from "./server-time.service";
 
 class SharedStateCoordinatorStub {
   updateConfig = jest.fn();
@@ -23,7 +26,7 @@ class SharedStateCoordinatorStub {
   requestSync = jest.fn();
   readPersistedState = jest.fn<SharedSessionState | null, []>(() => null);
   clearPersistedState = jest.fn();
-  getSourceId = jest.fn(() => 'coordinator-stub');
+  getSourceId = jest.fn(() => "coordinator-stub");
   private readonly updatesSubject = new Subject<SharedStateMessage>();
   readonly updates$ = this.updatesSubject.asObservable();
 
@@ -32,7 +35,7 @@ class SharedStateCoordinatorStub {
   }
 }
 
-jest.mock('../utils/broadcast-channel', () => {
+jest.mock("../utils/broadcast-channel", () => {
   class MockBroadcastAdapter implements BroadcastAdapter {
     readonly messages: unknown[] = [];
     private readonly listeners = new Set<(message: MessageEvent) => void>();
@@ -41,7 +44,9 @@ jest.mock('../utils/broadcast-channel', () => {
 
     publish(message: unknown): void {
       this.messages.push(message);
-      this.listeners.forEach(listener => listener({ data: message } as MessageEvent));
+      this.listeners.forEach((listener) =>
+        listener({ data: message } as MessageEvent),
+      );
     }
 
     close(): void {
@@ -53,7 +58,9 @@ jest.mock('../utils/broadcast-channel', () => {
     }
 
     emit(message: unknown): void {
-      this.listeners.forEach(listener => listener({ data: message } as MessageEvent));
+      this.listeners.forEach((listener) =>
+        listener({ data: message } as MessageEvent),
+      );
     }
   }
 
@@ -67,14 +74,18 @@ jest.mock('../utils/broadcast-channel', () => {
     },
     __getChannel: (name: string) => channels.get(name),
     __resetChannels: () => {
-      channels.forEach(channel => channel.close());
+      channels.forEach((channel) => channel.close());
       channels.clear();
-    }
+    },
   };
 });
 
 type BroadcastMockModule = {
-  __getChannel: (name: string) => (BroadcastAdapter & { messages: unknown[]; emit(message: unknown): void }) | undefined;
+  __getChannel: (
+    name: string,
+  ) =>
+    | (BroadcastAdapter & { messages: unknown[]; emit(message: unknown): void })
+    | undefined;
   __resetChannels: () => void;
 };
 
@@ -94,7 +105,7 @@ class MockTimeSourceService {
   }
 }
 
-describe('SessionTimeoutService cross-tab sync', () => {
+describe("SessionTimeoutService cross-tab sync", () => {
   let visibilityState: DocumentVisibilityState;
   let originalVisibilityDescriptor: PropertyDescriptor | undefined;
 
@@ -110,18 +121,18 @@ describe('SessionTimeoutService cross-tab sync', () => {
     warnBeforeMs: 300,
     pollingMs: 50,
     activityResetCooldownMs: 0,
-    storageKeyPrefix: 'test',
-    appInstanceId: 'testApp',
-    strategy: 'userOnly',
+    storageKeyPrefix: "test",
+    appInstanceId: "testApp",
+    strategy: "userOnly",
     httpActivity: {
       enabled: false,
-      strategy: 'allowlist',
+      strategy: "allowlist",
       allowlist: [],
       denylist: [],
       ignoreOnInitMs: 0,
       cooldownMs: 0,
       onlyWhenTabFocused: false,
-      primaryTabOnly: false
+      primaryTabOnly: false,
     },
     actionDelays: {
       start: 0,
@@ -130,65 +141,83 @@ describe('SessionTimeoutService cross-tab sync', () => {
       extend: 0,
       pause: 0,
       resume: 0,
-      expire: 0
+      expire: 0,
     },
-    openNewTabBehavior: 'inherit',
+    openNewTabBehavior: "inherit",
     routerCountsAsActivity: true,
     domActivityEvents: DEFAULT_SESSION_TIMEOUT_CONFIG.domActivityEvents,
     debounceMouseMs: 800,
     debounceKeyMs: 200,
     maxExtendPerSession: 0,
-    onExpire: 'emit',
-    timeSource: 'client',
+    onExpire: "emit",
+    timeSource: "client",
     serverTimeEndpoint: undefined,
-    logging: 'silent',
+    logging: "silent",
     resetOnWarningActivity: true,
     ignoreUserActivityWhenPaused: false,
-    allowManualExtendWhenExpired: false
+    allowManualExtendWhenExpired: false,
   };
-  const channelName = 'testApp:test:session-timeout';
-  const leaderKey = 'testApp:test:leader';
+  const channelName = "testApp:test:session-timeout";
+  const leaderKey = "testApp:test:leader";
   const HEARTBEAT_INTERVAL_MS = 1500;
 
   beforeEach(() => {
-    originalVisibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
-    visibilityState = 'visible';
-    Object.defineProperty(document, 'visibilityState', {
+    originalVisibilityDescriptor = Object.getOwnPropertyDescriptor(
+      document,
+      "visibilityState",
+    );
+    visibilityState = "visible";
+    Object.defineProperty(document, "visibilityState", {
       configurable: true,
-      get: () => visibilityState
+      get: () => visibilityState,
     });
   });
 
   beforeEach(() => {
-    broadcastMock = jest.requireMock('../utils/broadcast-channel') as BroadcastMockModule;
+    broadcastMock = jest.requireMock(
+      "../utils/broadcast-channel",
+    ) as BroadcastMockModule;
     broadcastMock.__resetChannels();
 
     TestBed.configureTestingModule({
       providers: [
         SessionTimeoutService,
-        { provide: SharedStateCoordinatorService, useClass: SharedStateCoordinatorStub },
+        {
+          provide: SharedStateCoordinatorService,
+          useClass: SharedStateCoordinatorStub,
+        },
         { provide: TimeSourceService, useClass: MockTimeSourceService },
         { provide: SESSION_TIMEOUT_CONFIG, useValue: baseConfig },
-        { provide: ServerTimeService, useValue: { configure: jest.fn(), stop: jest.fn() } }
-      ]
+        {
+          provide: ServerTimeService,
+          useValue: { configure: jest.fn(), stop: jest.fn() },
+        },
+      ],
     });
 
     sharedCoordinator = TestBed.inject(
-      SharedStateCoordinatorService
+      SharedStateCoordinatorService,
     ) as unknown as SharedStateCoordinatorStub;
     requestSyncMock = sharedCoordinator.requestSync;
     publishStateMock = sharedCoordinator.publishState;
     service = TestBed.inject(SessionTimeoutService);
-    time = TestBed.inject(TimeSourceService) as unknown as MockTimeSourceService;
+    time = TestBed.inject(
+      TimeSourceService,
+    ) as unknown as MockTimeSourceService;
   });
 
   afterEach(() => {
     requestSyncMock?.mockReset();
     publishStateMock?.mockReset();
     if (originalVisibilityDescriptor) {
-      Object.defineProperty(document, 'visibilityState', originalVisibilityDescriptor);
+      Object.defineProperty(
+        document,
+        "visibilityState",
+        originalVisibilityDescriptor,
+      );
     } else {
-      delete (document as { visibilityState?: DocumentVisibilityState }).visibilityState;
+      delete (document as { visibilityState?: DocumentVisibilityState })
+        .visibilityState;
     }
     originalVisibilityDescriptor = undefined;
     localStorage.clear();
@@ -207,18 +236,18 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
   function setVisibility(state: DocumentVisibilityState): void {
     visibilityState = state;
-    document.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event("visibilitychange"));
   }
 
   function writeLeaderRecord(id: string, updatedAt: number = Date.now()): void {
     const payload = JSON.stringify({ id, updatedAt });
     localStorage.setItem(leaderKey, payload);
     window.dispatchEvent(
-      new StorageEvent('storage', {
+      new StorageEvent("storage", {
         key: leaderKey,
         newValue: payload,
-        storageArea: localStorage
-      })
+        storageArea: localStorage,
+      }),
     );
   }
 
@@ -230,57 +259,64 @@ describe('SessionTimeoutService cross-tab sync', () => {
     return service.leaderRoleSignal();
   }
 
-  function leaderInfo(): SharedSessionState['leader'] | null {
+  function leaderInfo(): SharedSessionState["leader"] | null {
     return service.leaderInfoSignal();
   }
 
   function buildSharedState(
-    overrides?: Partial<Omit<SharedSessionState, 'config' | 'metadata'>> & {
-      config?: Partial<SharedSessionState['config']>;
-      metadata?: Partial<SharedSessionState['metadata']>;
-    }
+    overrides?: Partial<Omit<SharedSessionState, "config" | "metadata">> & {
+      config?: Partial<SharedSessionState["config"]>;
+      metadata?: Partial<SharedSessionState["metadata"]>;
+    },
   ): SharedSessionState {
     const now = time.now();
-    const writerId = overrides?.metadata?.writerId ?? 'remote-coord';
+    const writerId = overrides?.metadata?.writerId ?? "remote-coord";
     const logicalClock = overrides?.metadata?.logicalClock ?? now;
 
-    const metadata: SharedSessionState['metadata'] = {
+    const metadata: SharedSessionState["metadata"] = {
       revision: overrides?.metadata?.revision ?? 1,
       logicalClock,
       writerId,
-      operation: overrides?.metadata?.operation ?? 'bootstrap',
-      causalityToken: overrides?.metadata?.causalityToken ?? writerId + ':' + logicalClock
+      operation: overrides?.metadata?.operation ?? "bootstrap",
+      causalityToken:
+        overrides?.metadata?.causalityToken ?? writerId + ":" + logicalClock,
     };
 
-    const snapshot: SharedSessionState['snapshot'] = overrides?.snapshot ?? {
-      state: 'IDLE',
+    const snapshot: SharedSessionState["snapshot"] = overrides?.snapshot ?? {
+      state: "IDLE",
       remainingMs: baseConfig.countdownMs,
       idleStartAt: now,
       countdownEndAt: now + baseConfig.countdownMs,
       lastActivityAt: now,
-      paused: false
+      paused: false,
     };
 
     const configWriterId = overrides?.config?.writerId ?? writerId;
     const configLogicalClock = overrides?.config?.logicalClock ?? logicalClock;
 
-    const config: SharedSessionState['config'] = {
+    const config: SharedSessionState["config"] = {
       idleGraceMs: overrides?.config?.idleGraceMs ?? baseConfig.idleGraceMs,
       countdownMs: overrides?.config?.countdownMs ?? baseConfig.countdownMs,
       warnBeforeMs: overrides?.config?.warnBeforeMs ?? baseConfig.warnBeforeMs,
       activityResetCooldownMs:
-        overrides?.config?.activityResetCooldownMs ?? baseConfig.activityResetCooldownMs,
-      storageKeyPrefix: overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
-      resumeBehavior: overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
+        overrides?.config?.activityResetCooldownMs ??
+        baseConfig.activityResetCooldownMs,
+      storageKeyPrefix:
+        overrides?.config?.storageKeyPrefix ?? baseConfig.storageKeyPrefix,
+      resumeBehavior:
+        overrides?.config?.resumeBehavior ?? baseConfig.resumeBehavior,
       resetOnWarningActivity:
-        overrides?.config?.resetOnWarningActivity ?? baseConfig.resetOnWarningActivity,
+        overrides?.config?.resetOnWarningActivity ??
+        baseConfig.resetOnWarningActivity,
       ignoreUserActivityWhenPaused:
-        overrides?.config?.ignoreUserActivityWhenPaused ?? baseConfig.ignoreUserActivityWhenPaused,
+        overrides?.config?.ignoreUserActivityWhenPaused ??
+        baseConfig.ignoreUserActivityWhenPaused,
       allowManualExtendWhenExpired:
-        overrides?.config?.allowManualExtendWhenExpired ?? baseConfig.allowManualExtendWhenExpired,
+        overrides?.config?.allowManualExtendWhenExpired ??
+        baseConfig.allowManualExtendWhenExpired,
       revision: overrides?.config?.revision ?? 1,
       logicalClock: configLogicalClock,
-      writerId: configWriterId
+      writerId: configWriterId,
     };
 
     return {
@@ -289,29 +325,29 @@ describe('SessionTimeoutService cross-tab sync', () => {
       leader: overrides?.leader ?? null,
       metadata,
       snapshot,
-      config
+      config,
     };
   }
 
-
-
-  it('publishes extend messages with snapshot details', () => {
+  it("publishes extend messages with snapshot details", () => {
     const messages: CrossTabMessage[] = [];
-    service.crossTab$.subscribe(message => messages.push(message));
+    service.crossTab$.subscribe((message) => messages.push(message));
 
     service.start();
     service.extend();
 
-    const extendMessages = messages.filter(message => message.type === 'extend');
+    const extendMessages = messages.filter(
+      (message) => message.type === "extend",
+    );
     expect(extendMessages).toHaveLength(1);
     const extendMessage = extendMessages[0];
-    expect(extendMessage.type).toBe('extend');
-    expect(typeof extendMessage.sourceId).toBe('string');
-    expect(extendMessage.payload?.snapshot?.state).toBe('IDLE');
+    expect(extendMessage.type).toBe("extend");
+    expect(typeof extendMessage.sourceId).toBe("string");
+    expect(extendMessage.payload?.snapshot?.state).toBe("IDLE");
     expect(extendMessage.payload?.snapshot?.countdownEndAt).toBeNull();
   });
 
-  it('applies remote extend snapshot into local state', () => {
+  it("applies remote extend snapshot into local state", () => {
     service.start();
 
     const channel = broadcastMock.__getChannel(channelName);
@@ -320,33 +356,33 @@ describe('SessionTimeoutService cross-tab sync', () => {
     const remoteSnapshotNow = time.now();
     const remoteSnapshot: SessionSnapshot = {
       ...snapshot(),
-      state: 'IDLE',
+      state: "IDLE",
       idleStartAt: remoteSnapshotNow,
       lastActivityAt: remoteSnapshotNow,
       countdownEndAt: null,
       remainingMs: baseConfig.countdownMs,
-      paused: false
+      paused: false,
     };
 
     const events: string[] = [];
-    service.events$.subscribe(event => events.push(event.type));
+    service.events$.subscribe((event) => events.push(event.type));
 
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'extend',
+      sourceId: "remote-tab",
+      type: "extend",
       at: time.now(),
-      payload: { snapshot: remoteSnapshot }
+      payload: { snapshot: remoteSnapshot },
     } satisfies CrossTabMessage);
 
     const current = snapshot();
-    expect(current.state).toBe('IDLE');
+    expect(current.state).toBe("IDLE");
     expect(current.remainingMs).toBe(remoteSnapshot.remainingMs);
     expect(current.idleStartAt).toBe(remoteSnapshot.idleStartAt);
     expect(current.countdownEndAt).toBeNull();
-    expect(events).toContain('Extended');
+    expect(events).toContain("Extended");
   });
 
-  it('forces local expiration when remote tab expires', () => {
+  it("forces local expiration when remote tab expires", () => {
     service.start();
     time.advance(baseConfig.idleGraceMs + baseConfig.countdownMs);
     manualTick();
@@ -355,34 +391,34 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(channel).toBeDefined();
 
     const expireEvents: CrossTabMessage[] = [];
-    service.crossTab$.subscribe(message => {
-      if (message.type === 'expire') {
+    service.crossTab$.subscribe((message) => {
+      if (message.type === "expire") {
         expireEvents.push(message);
       }
     });
 
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'expire',
+      sourceId: "remote-tab",
+      type: "expire",
       at: time.now(),
       payload: {
         snapshot: {
           ...snapshot(),
-          state: 'EXPIRED',
+          state: "EXPIRED",
           remainingMs: 0,
           countdownEndAt: time.now(),
-          paused: false
-        }
-      }
+          paused: false,
+        },
+      },
     } satisfies CrossTabMessage);
 
     const current = snapshot();
-    expect(current.state).toBe('EXPIRED');
+    expect(current.state).toBe("EXPIRED");
     expect(current.remainingMs).toBe(0);
     expect(expireEvents.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('applies shared session state when sync message includes sharedState payload', done => {
+  it("applies shared session state when sync message includes sharedState payload", (done) => {
     service.start();
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
@@ -394,25 +430,25 @@ describe('SessionTimeoutService cross-tab sync', () => {
         warnBeforeMs: 400,
         activityResetCooldownMs: 20,
         storageKeyPrefix: baseConfig.storageKeyPrefix,
-        resumeBehavior: 'autoOnServerSync',
+        resumeBehavior: "autoOnServerSync",
         ignoreUserActivityWhenPaused: true,
-        allowManualExtendWhenExpired: true
-      } as Partial<SharedSessionState['config']>,
+        allowManualExtendWhenExpired: true,
+      } as Partial<SharedSessionState["config"]>,
       snapshot: {
-        state: 'COUNTDOWN',
+        state: "COUNTDOWN",
         remainingMs: 900,
         idleStartAt: time.now() - 50,
         countdownEndAt: time.now() + 900,
         lastActivityAt: time.now() - 25,
-        paused: false
-      }
+        paused: false,
+      },
     });
 
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'sync',
+      sourceId: "remote-tab",
+      type: "sync",
       at: time.now(),
-      payload: { sharedState }
+      payload: { sharedState },
     } satisfies CrossTabMessage);
 
     const updatedConfig = service.getConfig();
@@ -423,17 +459,23 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(updatedConfig.allowManualExtendWhenExpired).toBe(true);
 
     const currentSnapshot = snapshot();
-    expect(currentSnapshot.state).toBe('COUNTDOWN');
+    expect(currentSnapshot.state).toBe("COUNTDOWN");
     expect(currentSnapshot.remainingMs).toBe(900);
-    expect(currentSnapshot.countdownEndAt).toBe(sharedState.snapshot.countdownEndAt);
+    expect(currentSnapshot.countdownEndAt).toBe(
+      sharedState.snapshot.countdownEndAt,
+    );
     // Reset the module here to tear down leader-election timers before Jest waits for idle handles.
     TestBed.resetTestingModule();
     done();
   });
-  it('emits leader election events on leadership changes', async () => {
-    const captured: Array<{ type: string; meta?: Record<string, unknown> }> = [];
-    const sub = service.events$.subscribe(event => {
-      captured.push({ type: event.type, meta: event.meta as Record<string, unknown> | undefined });
+  it("emits leader election events on leadership changes", async () => {
+    const captured: Array<{ type: string; meta?: Record<string, unknown> }> =
+      [];
+    const sub = service.events$.subscribe((event) => {
+      captured.push({
+        type: event.type,
+        meta: event.meta as Record<string, unknown> | undefined,
+      });
     });
     const leader = TestBed.inject(LeaderElectionService);
 
@@ -441,21 +483,30 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     leader.stepDown();
     expect(leader.isLeader()).toBe(false);
-    await new Promise(resolve => globalThis.setTimeout(resolve, 0));
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 
-    const remoteRecord = { id: 'remote-tab', updatedAt: Date.now() };
+    const remoteRecord = { id: "remote-tab", updatedAt: Date.now() };
     localStorage.setItem(leaderKey, JSON.stringify(remoteRecord));
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: leaderKey,
-      newValue: JSON.stringify(remoteRecord),
-      storageArea: localStorage
-    }));
-    const staleRecord = { id: 'remote-tab', updatedAt: Date.now() - HEARTBEAT_INTERVAL_MS * 4 };
+    window.dispatchEvent(
+      new StorageEvent("storage", {
+        key: leaderKey,
+        newValue: JSON.stringify(remoteRecord),
+        storageArea: localStorage,
+      }),
+    );
+    const staleRecord = {
+      id: "remote-tab",
+      updatedAt: Date.now() - HEARTBEAT_INTERVAL_MS * 4,
+    };
     localStorage.setItem(leaderKey, JSON.stringify(staleRecord));
     leader.updateConfig(baseConfig);
-    await new Promise(resolve => globalThis.setTimeout(resolve, HEARTBEAT_INTERVAL_MS));
+    await new Promise((resolve) =>
+      globalThis.setTimeout(resolve, HEARTBEAT_INTERVAL_MS),
+    );
 
-    const leaderEvent = captured.find(event => event.type === 'LeaderElected');
+    const leaderEvent = captured.find(
+      (event) => event.type === "LeaderElected",
+    );
     expect(leader.isLeader()).toBe(true);
     if (leaderEvent) {
       expect(leaderEvent.meta?.leaderId).toBeDefined();
@@ -464,27 +515,35 @@ describe('SessionTimeoutService cross-tab sync', () => {
     sub.unsubscribe();
   });
 
-  it('sends reset message when follower has activity', () => {
+  it("sends reset message when follower has activity", () => {
     const leader = TestBed.inject(LeaderElectionService);
-    jest.spyOn(leader, 'isLeader').mockReturnValue(false); // This tab is a follower
+    jest.spyOn(leader, "isLeader").mockReturnValue(false); // This tab is a follower
 
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
-    const postMessageSpy = jest.spyOn(channel!, 'publish');
+    const postMessageSpy = jest.spyOn(channel!, "publish");
 
     service.start();
     // Simulate a DOM activity event
     const internal = service as unknown as {
-      handleExternalActivity: (event: { source: string; at: number; meta?: Record<string, unknown> }, reason: string) => void;
+      handleExternalActivity: (
+        event: { source: string; at: number; meta?: Record<string, unknown> },
+        reason: string,
+      ) => void;
     };
-    internal.handleExternalActivity({ source: 'dom', at: time.now() }, 'ResetByActivity');
+    internal.handleExternalActivity(
+      { source: "dom", at: time.now() },
+      "ResetByActivity",
+    );
 
-    expect(postMessageSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'reset' }));
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "reset" }),
+    );
   });
 
-  it('leader resets idle timer on reset message from follower', () => {
+  it("leader resets idle timer on reset message from follower", () => {
     const leader = TestBed.inject(LeaderElectionService);
-    jest.spyOn(leader, 'isLeader').mockReturnValue(true); // This tab is the leader
+    jest.spyOn(leader, "isLeader").mockReturnValue(true); // This tab is the leader
 
     service.start();
     time.advance(100);
@@ -499,10 +558,10 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     // Simulate receiving a reset message from a follower
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'reset',
+      sourceId: "remote-tab",
+      type: "reset",
       at: activityTime,
-      payload: { activitySource: 'dom' }
+      payload: { activitySource: "dom" },
     } satisfies CrossTabMessage);
 
     manualTick();
@@ -512,50 +571,55 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(idleStartAfter).toBe(activityTime);
   });
 
-  it('ignores cross-tab reset when warning resets are disabled', () => {
+  it("ignores cross-tab reset when warning resets are disabled", () => {
     const leader = TestBed.inject(LeaderElectionService);
-    jest.spyOn(leader, 'isLeader').mockReturnValue(true);
+    jest.spyOn(leader, "isLeader").mockReturnValue(true);
     service.setConfig({ resetOnWarningActivity: false });
 
-    const activities: Array<{ source: string; meta?: Record<string, unknown> }> = [];
-    service.activity$.subscribe(activity => activities.push({ source: activity.source, meta: activity.meta }));
+    const activities: Array<{
+      source: string;
+      meta?: Record<string, unknown>;
+    }> = [];
+    service.activity$.subscribe((activity) =>
+      activities.push({ source: activity.source, meta: activity.meta }),
+    );
 
     service.start();
     time.advance(baseConfig.idleGraceMs + 1);
     manualTick();
     time.advance(baseConfig.countdownMs - baseConfig.warnBeforeMs + 10);
     manualTick();
-    expect(snapshot().state).toBe('WARN');
+    expect(snapshot().state).toBe("WARN");
     const idleStartBefore = snapshot().idleStartAt;
 
     const channel = broadcastMock.__getChannel(channelName);
     expect(channel).toBeDefined();
 
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'reset',
+      sourceId: "remote-tab",
+      type: "reset",
       at: time.now(),
-      payload: { activitySource: 'dom' }
+      payload: { activitySource: "dom" },
     } satisfies CrossTabMessage);
 
     manualTick();
 
     expect(snapshot().idleStartAt).toBe(idleStartBefore);
     const lastActivity = activities[activities.length - 1];
-    expect(lastActivity?.source).toBe('cross-tab');
+    expect(lastActivity?.source).toBe("cross-tab");
     expect(lastActivity?.meta).toMatchObject({
       resetSuppressed: true,
-      resetSuppressedReason: 'warning-phase-disabled',
-      activitySource: 'dom'
+      resetSuppressedReason: "warning-phase-disabled",
+      activitySource: "dom",
     });
   });
 
-  it('broadcasts shared state in response to sync requests', async () => {
+  it("broadcasts shared state in response to sync requests", async () => {
     const leader = TestBed.inject(LeaderElectionService);
-    jest.spyOn(leader, 'isLeader').mockReturnValue(true);
+    jest.spyOn(leader, "isLeader").mockReturnValue(true);
 
     const messages: CrossTabMessage[] = [];
-    service.crossTab$.subscribe(message => messages.push(message));
+    service.crossTab$.subscribe((message) => messages.push(message));
 
     service.start();
     messages.length = 0;
@@ -564,19 +628,21 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(channel).toBeDefined();
 
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'sync-request',
-      at: time.now()
+      sourceId: "remote-tab",
+      type: "sync-request",
+      at: time.now(),
     } satisfies CrossTabMessage);
 
     await flushAsync();
 
-    const syncMessage = messages.find(message => message.type === 'sync');
+    const syncMessage = messages.find((message) => message.type === "sync");
     expect(syncMessage).toBeDefined();
-    expect(syncMessage?.payload?.sharedState?.version).toBe(SHARED_STATE_VERSION);
+    expect(syncMessage?.payload?.sharedState?.version).toBe(
+      SHARED_STATE_VERSION,
+    );
   });
 
-  it('requests shared-state sync from coordinator when leadership is lost', async () => {
+  it("requests shared-state sync from coordinator when leadership is lost", async () => {
     const leader = TestBed.inject(LeaderElectionService);
 
     await flushAsync();
@@ -586,10 +652,10 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     await flushAsync();
 
-    expect(requestSyncMock).toHaveBeenCalledWith('leader-changed');
+    expect(requestSyncMock).toHaveBeenCalledWith("leader-changed");
   });
 
-  it('publishes shared state bundle when leadership is acquired', async () => {
+  it("publishes shared state bundle when leadership is acquired", async () => {
     const leader = TestBed.inject(LeaderElectionService);
 
     await flushAsync();
@@ -606,10 +672,12 @@ describe('SessionTimeoutService cross-tab sync', () => {
     expect(publishStateMock.mock.calls.length).toBeGreaterThan(initialCalls);
   });
 
-  it('emits sync-request message on leader loss to prompt followers', async () => {
+  it("emits sync-request message on leader loss to prompt followers", async () => {
     const leader = TestBed.inject(LeaderElectionService);
     const captured: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => captured.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      captured.push(message),
+    );
 
     await flushAsync();
     captured.length = 0;
@@ -618,13 +686,15 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     await flushAsync();
 
-    const syncRequestExists = captured.some(message => message.type === 'sync-request');
+    const syncRequestExists = captured.some(
+      (message) => message.type === "sync-request",
+    );
     expect(syncRequestExists).toBe(true);
 
     sub.unsubscribe();
   });
 
-  it('requests sync when leader id updates without local leadership', async () => {
+  it("requests sync when leader id updates without local leadership", async () => {
     const leader = TestBed.inject(LeaderElectionService);
 
     service.start();
@@ -634,44 +704,50 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     requestSyncMock.mockClear();
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
 
-    const initialRecord = { id: 'leader-a', updatedAt: Date.now() };
+    const initialRecord = { id: "leader-a", updatedAt: Date.now() };
     localStorage.setItem(leaderKey, JSON.stringify(initialRecord));
     window.dispatchEvent(
-      new StorageEvent('storage', {
+      new StorageEvent("storage", {
         key: leaderKey,
         newValue: JSON.stringify(initialRecord),
-        storageArea: localStorage
-      })
+        storageArea: localStorage,
+      }),
     );
     await flushAsync();
     requestSyncMock.mockClear();
     outbound.length = 0;
 
-    const nextRecord = { id: 'leader-b', updatedAt: Date.now() };
+    const nextRecord = { id: "leader-b", updatedAt: Date.now() };
     localStorage.setItem(leaderKey, JSON.stringify(nextRecord));
     window.dispatchEvent(
-      new StorageEvent('storage', {
+      new StorageEvent("storage", {
         key: leaderKey,
         newValue: JSON.stringify(nextRecord),
-        storageArea: localStorage
-      })
+        storageArea: localStorage,
+      }),
     );
 
     await flushAsync();
 
-    expect(requestSyncMock).toHaveBeenCalledWith('leader-updated');
-    const syncRequest = outbound.find(message => message.type === 'sync-request');
+    expect(requestSyncMock).toHaveBeenCalledWith("leader-updated");
+    const syncRequest = outbound.find(
+      (message) => message.type === "sync-request",
+    );
     expect(syncRequest).toBeDefined();
 
     sub.unsubscribe();
   });
 
-  it('requests sync when visibility resumes after extended hidden period', async () => {
+  it("requests sync when visibility resumes after extended hidden period", async () => {
     const leader = TestBed.inject(LeaderElectionService);
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
 
     service.start();
     await flushAsync();
@@ -679,50 +755,58 @@ describe('SessionTimeoutService cross-tab sync', () => {
     await flushAsync();
     requestSyncMock.mockClear();
 
-    const remoteRecord = { id: 'remote-tab', updatedAt: Date.now() };
+    const remoteRecord = { id: "remote-tab", updatedAt: Date.now() };
     localStorage.setItem(leaderKey, JSON.stringify(remoteRecord));
     window.dispatchEvent(
-      new StorageEvent('storage', {
+      new StorageEvent("storage", {
         key: leaderKey,
         newValue: JSON.stringify(remoteRecord),
-        storageArea: localStorage
-      })
+        storageArea: localStorage,
+      }),
     );
     await flushAsync();
     requestSyncMock.mockClear();
 
-    setVisibility('hidden');
+    setVisibility("hidden");
     time.advance(LEADER_TTL_MS + 10);
-    setVisibility('visible');
+    setVisibility("visible");
     await flushAsync();
 
-    expect(requestSyncMock).toHaveBeenCalledWith('visibilitychange');
-    const syncRequest = outbound.find(message => message.type === 'sync-request');
+    expect(requestSyncMock).toHaveBeenCalledWith("visibilitychange");
+    const syncRequest = outbound.find(
+      (message) => message.type === "sync-request",
+    );
     expect(syncRequest).toBeDefined();
 
     sub.unsubscribe();
   });
 
-  it('requests sync when visibility resumes when remote heartbeat is stale', async () => {
+  it("requests sync when visibility resumes when remote heartbeat is stale", async () => {
     const leader = TestBed.inject(LeaderElectionService);
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
 
     service.start();
     await flushAsync();
     leader.stepDown();
     await flushAsync();
-    writeLeaderRecord('remote-tab');
+    writeLeaderRecord("remote-tab");
     await flushAsync();
 
     const staleState = buildSharedState({
-      leader: { id: 'remote-tab', heartbeatAt: time.now() - (LEADER_TTL_MS + 25), epoch: 3 }
+      leader: {
+        id: "remote-tab",
+        heartbeatAt: time.now() - (LEADER_TTL_MS + 25),
+        epoch: 3,
+      },
     });
     sharedCoordinator.emit({
-      type: 'state',
-      sourceId: 'remote-tab',
+      type: "state",
+      sourceId: "remote-tab",
       at: time.now(),
-      state: staleState
+      state: staleState,
     });
 
     await flushAsync();
@@ -730,38 +814,42 @@ describe('SessionTimeoutService cross-tab sync', () => {
     outbound.length = 0;
 
     const halfTtl = Math.floor(LEADER_TTL_MS / 2);
-    setVisibility('hidden');
+    setVisibility("hidden");
     time.advance(halfTtl);
-    setVisibility('visible');
+    setVisibility("visible");
     await flushAsync();
 
-    expect(requestSyncMock).toHaveBeenCalledWith('visibilitychange');
-    const syncRequest = outbound.find(message => message.type === 'sync-request');
+    expect(requestSyncMock).toHaveBeenCalledWith("visibilitychange");
+    const syncRequest = outbound.find(
+      (message) => message.type === "sync-request",
+    );
     expect(syncRequest).toBeDefined();
 
     sub.unsubscribe();
   });
 
-  it('does not request sync when visibility resumes with fresh heartbeat', async () => {
+  it("does not request sync when visibility resumes with fresh heartbeat", async () => {
     const leader = TestBed.inject(LeaderElectionService);
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
 
     service.start();
     await flushAsync();
     leader.stepDown();
     await flushAsync();
-    writeLeaderRecord('remote-tab');
+    writeLeaderRecord("remote-tab");
     await flushAsync();
 
     const freshState = buildSharedState({
-      leader: { id: 'remote-tab', heartbeatAt: time.now(), epoch: 2 }
+      leader: { id: "remote-tab", heartbeatAt: time.now(), epoch: 2 },
     });
     sharedCoordinator.emit({
-      type: 'state',
-      sourceId: 'remote-tab',
+      type: "state",
+      sourceId: "remote-tab",
       at: time.now(),
-      state: freshState
+      state: freshState,
     });
 
     await flushAsync();
@@ -769,21 +857,25 @@ describe('SessionTimeoutService cross-tab sync', () => {
     outbound.length = 0;
 
     const halfTtl = Math.floor(LEADER_TTL_MS / 2);
-    setVisibility('hidden');
+    setVisibility("hidden");
     time.advance(halfTtl);
-    setVisibility('visible');
+    setVisibility("visible");
     await flushAsync();
 
     expect(requestSyncMock).not.toHaveBeenCalled();
-    const syncRequest = outbound.find(message => message.type === 'sync-request');
+    const syncRequest = outbound.find(
+      (message) => message.type === "sync-request",
+    );
     expect(syncRequest).toBeUndefined();
 
     sub.unsubscribe();
   });
 
-  it('broadcasts shared state when coordinator requests a sync while leader', async () => {
+  it("broadcasts shared state when coordinator requests a sync while leader", async () => {
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
     const leader = TestBed.inject(LeaderElectionService);
 
     service.start();
@@ -793,84 +885,88 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     publishStateMock.mockClear();
     sharedCoordinator.emit({
-      type: 'request-sync',
-      sourceId: 'remote-tab',
-      at: time.now()
+      type: "request-sync",
+      sourceId: "remote-tab",
+      at: time.now(),
     });
 
     await flushAsync();
 
     expect(publishStateMock).toHaveBeenCalled();
-    const syncMessage = outbound.find(message => message.type === 'sync');
+    const syncMessage = outbound.find((message) => message.type === "sync");
     expect(syncMessage?.payload?.sharedState).toBeDefined();
 
     sub.unsubscribe();
   });
 
-  it('ignores coordinator sync requests when not the leader', async () => {
+  it("ignores coordinator sync requests when not the leader", async () => {
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
     const leader = TestBed.inject(LeaderElectionService);
 
-    jest.spyOn(leader, 'isLeader').mockReturnValue(false);
-    jest.spyOn(leader, 'leaderId').mockReturnValue('remote-tab');
+    jest.spyOn(leader, "isLeader").mockReturnValue(false);
+    jest.spyOn(leader, "leaderId").mockReturnValue("remote-tab");
 
     service.start();
     await flushAsync();
     leader.stepDown();
     await flushAsync();
-    writeLeaderRecord('remote-tab');
+    writeLeaderRecord("remote-tab");
     await flushAsync();
 
     publishStateMock.mockClear();
     sharedCoordinator.emit({
-      type: 'request-sync',
-      sourceId: 'remote-tab',
-      at: time.now()
+      type: "request-sync",
+      sourceId: "remote-tab",
+      at: time.now(),
     });
 
     await flushAsync();
 
     expect(publishStateMock).not.toHaveBeenCalled();
-    const syncMessage = outbound.find(message => message.type === 'sync');
+    const syncMessage = outbound.find((message) => message.type === "sync");
     expect(syncMessage).toBeUndefined();
 
     sub.unsubscribe();
   });
 
-  it('ignores cross-tab sync-request messages when follower', async () => {
+  it("ignores cross-tab sync-request messages when follower", async () => {
     const leader = TestBed.inject(LeaderElectionService);
     const outbound: CrossTabMessage[] = [];
-    const sub = service.crossTab$.subscribe(message => outbound.push(message));
+    const sub = service.crossTab$.subscribe((message) =>
+      outbound.push(message),
+    );
     const channel = broadcastMock.__getChannel(channelName);
 
-    jest.spyOn(leader, 'isLeader').mockReturnValue(false);
-    jest.spyOn(leader, 'leaderId').mockReturnValue('remote-tab');
+    jest.spyOn(leader, "isLeader").mockReturnValue(false);
+    jest.spyOn(leader, "leaderId").mockReturnValue("remote-tab");
 
     service.start();
     await flushAsync();
     leader.stepDown();
     await flushAsync();
-    writeLeaderRecord('remote-tab');
+    writeLeaderRecord("remote-tab");
     await flushAsync();
 
     publishStateMock.mockClear();
     channel!.emit({
-      sourceId: 'remote-tab',
-      type: 'sync-request',
-      at: time.now()
+      sourceId: "remote-tab",
+      type: "sync-request",
+      at: time.now(),
     } satisfies CrossTabMessage);
 
     await flushAsync();
 
     expect(publishStateMock).not.toHaveBeenCalled();
-    const syncMessages = outbound.filter(message => message.type === 'sync');
+    const syncMessages = outbound.filter((message) => message.type === "sync");
     expect(syncMessages.length).toBe(0);
 
     sub.unsubscribe();
   });
 
-  it('applies shared state from coordinator updates to catch up follower snapshot', async () => {
+  it("applies shared state from coordinator updates to catch up follower snapshot", async () => {
     const leader = TestBed.inject(LeaderElectionService);
 
     service.start();
@@ -880,33 +976,33 @@ describe('SessionTimeoutService cross-tab sync', () => {
 
     const now = time.now();
     const remoteState = buildSharedState({
-      leader: { id: 'remote-tab', heartbeatAt: now, epoch: 4 },
+      leader: { id: "remote-tab", heartbeatAt: now, epoch: 4 },
       snapshot: {
-        state: 'COUNTDOWN',
+        state: "COUNTDOWN",
         remainingMs: 450,
         idleStartAt: now - 100,
         countdownEndAt: now + 450,
         lastActivityAt: now - 50,
-        paused: false
-      }
+        paused: false,
+      },
     });
     sharedCoordinator.emit({
-      type: 'state',
-      sourceId: 'remote-tab',
+      type: "state",
+      sourceId: "remote-tab",
       at: now,
-      state: remoteState
+      state: remoteState,
     });
 
     await flushAsync();
 
     const current = snapshot();
-    expect(current.state).toBe('COUNTDOWN');
+    expect(current.state).toBe("COUNTDOWN");
     expect(current.remainingMs).toBe(remoteState.snapshot.remainingMs);
     expect(current.countdownEndAt).toBe(remoteState.snapshot.countdownEndAt);
     expect(current.idleStartAt).toBe(remoteState.snapshot.idleStartAt);
   });
 
-  it('surfaces leader and follower roles through signals when leadership changes', async () => {
+  it("surfaces leader and follower roles through signals when leadership changes", async () => {
     const leader = TestBed.inject(LeaderElectionService);
 
     service.start();
@@ -915,55 +1011,55 @@ describe('SessionTimeoutService cross-tab sync', () => {
     leader.electLeader();
     await flushAsync();
 
-    expect(leaderRole()).toBe('leader');
+    expect(leaderRole()).toBe("leader");
     expect(leaderInfo()?.id).toBe(leader.leaderId());
 
     leader.stepDown();
     await flushAsync();
 
     const remoteState = buildSharedState({
-      leader: { id: 'remote-tab', heartbeatAt: time.now(), epoch: 2 }
+      leader: { id: "remote-tab", heartbeatAt: time.now(), epoch: 2 },
     });
     sharedCoordinator.emit({
-      type: 'state',
-      sourceId: 'remote-tab',
+      type: "state",
+      sourceId: "remote-tab",
       at: time.now(),
-      state: remoteState
+      state: remoteState,
     });
 
     await flushAsync();
 
-    expect(leaderRole()).toBe('follower');
-    expect(leaderInfo()?.id).toBe('remote-tab');
+    expect(leaderRole()).toBe("follower");
+    expect(leaderInfo()?.id).toBe("remote-tab");
 
     const clearedState = buildSharedState({ leader: null });
     sharedCoordinator.emit({
-      type: 'state',
-      sourceId: 'remote-tab',
+      type: "state",
+      sourceId: "remote-tab",
       at: time.now(),
-      state: clearedState
+      state: clearedState,
     });
 
     await flushAsync();
 
-    expect(leaderRole()).toBe('unknown');
+    expect(leaderRole()).toBe("unknown");
     expect(leaderInfo()).toBeNull();
   });
 
-  it('increments leader epoch using latest shared state metadata', async () => {
+  it("increments leader epoch using latest shared state metadata", async () => {
     const leader = TestBed.inject(LeaderElectionService);
 
     service.start();
     await flushAsync();
 
     const remoteState = buildSharedState({
-      leader: { id: 'remote', heartbeatAt: time.now(), epoch: 5 }
+      leader: { id: "remote", heartbeatAt: time.now(), epoch: 5 },
     });
     sharedCoordinator.emit({
-      type: 'state',
-      sourceId: 'remote',
+      type: "state",
+      sourceId: "remote",
       at: time.now(),
-      state: remoteState
+      state: remoteState,
     });
 
     await flushAsync();
@@ -977,8 +1073,8 @@ describe('SessionTimeoutService cross-tab sync', () => {
     await flushAsync();
 
     const leaderStates = publishStateMock.mock.calls
-      .map(call => call[0] as SharedSessionState)
-      .filter(state => state.leader?.id === leader.leaderId());
+      .map((call) => call[0] as SharedSessionState)
+      .filter((state) => state.leader?.id === leader.leaderId());
 
     expect(leaderStates.length).toBeGreaterThan(0);
     expect(leaderStates.pop()?.leader?.epoch).toBe(6);

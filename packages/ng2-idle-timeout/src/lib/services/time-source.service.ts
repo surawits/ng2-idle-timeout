@@ -1,9 +1,9 @@
-import { Injectable, computed, signal } from '@angular/core';
-import type { Signal } from '@angular/core';
-import { toObservable } from '@angular/core/rxjs-interop';
-import { now } from '../utils/platform';
+import { Injectable, computed, signal } from "@angular/core";
+import type { Signal } from "@angular/core";
+import { toObservable } from "@angular/core/rxjs-interop";
+import { now } from "../utils/platform";
 
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class TimeSourceService {
   private readonly offsetSignal = signal(0);
 

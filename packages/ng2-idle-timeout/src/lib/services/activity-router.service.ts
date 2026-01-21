@@ -1,14 +1,14 @@
-import { DestroyRef, Injectable, NgZone, inject } from '@angular/core';
-import { Router } from '@angular/router';
-import type { Event as RouterEvent } from '@angular/router';
-import { Subject } from 'rxjs';
-import type { Subscription } from 'rxjs';
+import { DestroyRef, Injectable, NgZone, inject } from "@angular/core";
+import { Router } from "@angular/router";
+import type { Event as RouterEvent } from "@angular/router";
+import { Subject } from "rxjs";
+import type { Subscription } from "rxjs";
 
-import type { ActivityEvent } from '../models/activity-event';
-import type { SessionTimeoutConfig } from '../models/session-timeout-config';
-import { DEFAULT_SESSION_TIMEOUT_CONFIG } from '../defaults';
+import type { ActivityEvent } from "../models/activity-event";
+import type { SessionTimeoutConfig } from "../models/session-timeout-config";
+import { DEFAULT_SESSION_TIMEOUT_CONFIG } from "../defaults";
 
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class ActivityRouterService {
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
@@ -41,11 +41,11 @@ export class ActivityRouterService {
         }
         const now = Date.now();
         this.eventsSubject.next({
-          source: 'router',
+          source: "router",
           at: now,
           meta: {
-            event: event.constructor.name
-          }
+            event: event.constructor.name,
+          },
         });
       });
 

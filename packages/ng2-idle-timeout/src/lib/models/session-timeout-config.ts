@@ -1,26 +1,29 @@
-import type { ActivityEvent } from './activity-event';
+import type { ActivityEvent } from "./activity-event";
 
-export type SessionTimeoutStrategy = 'userOnly' | 'userAndHttpAllowlist' | 'aggressive';
+export type SessionTimeoutStrategy =
+  | "userOnly"
+  | "userAndHttpAllowlist"
+  | "aggressive";
 
 export const DOM_ACTIVITY_EVENT_NAMES = [
-  'mousemove',
-  'mousedown',
-  'click',
-  'wheel',
-  'scroll',
-  'keydown',
-  'keyup',
-  'touchstart',
-  'touchend',
-  'touchmove',
-  'visibilitychange'
+  "mousemove",
+  "mousedown",
+  "click",
+  "wheel",
+  "scroll",
+  "keydown",
+  "keyup",
+  "touchstart",
+  "touchend",
+  "touchmove",
+  "visibilitychange",
 ] as const;
 
 export type DomActivityEventName = (typeof DOM_ACTIVITY_EVENT_NAMES)[number];
 
 export interface HttpActivityPolicyConfig {
   enabled: boolean;
-  strategy: 'allowlist' | 'headerFlag' | 'aggressive';
+  strategy: "allowlist" | "headerFlag" | "aggressive";
   allowlist: readonly RegExp[];
   denylist: readonly RegExp[];
   headerFlag?: string;
@@ -52,23 +55,25 @@ export interface SessionTimeoutConfig {
   strategy: SessionTimeoutStrategy;
   httpActivity: HttpActivityPolicyConfig;
   actionDelays: SessionActionDelays;
-  openNewTabBehavior: 'inherit';
+  openNewTabBehavior: "inherit";
   routerCountsAsActivity: boolean;
   domActivityEvents: readonly DomActivityEventName[];
   debounceMouseMs: number;
   debounceKeyMs: number;
   maxExtendPerSession: number;
-  onExpire: 'emit' | 'callback' | string;
-  timeSource: 'client' | 'server';
+  onExpire: "emit" | "callback" | string;
+  timeSource: "client" | "server";
   serverTimeEndpoint?: string;
-  logging: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'silent';
+  logging: "trace" | "debug" | "info" | "warn" | "error" | "silent";
   resetOnWarningActivity: boolean;
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
-  resumeBehavior?: 'manual' | 'autoOnServerSync';
+  resumeBehavior?: "manual" | "autoOnServerSync";
 }
 
-export type SessionTimeoutPartialConfig = Partial<Omit<SessionTimeoutConfig, 'httpActivity' | 'actionDelays'>> & {
+export type SessionTimeoutPartialConfig = Partial<
+  Omit<SessionTimeoutConfig, "httpActivity" | "actionDelays">
+> & {
   httpActivity?: Partial<HttpActivityPolicyConfig>;
   actionDelays?: Partial<SessionActionDelays>;
 };
@@ -78,7 +83,7 @@ export interface ExpireCallback {
 }
 
 export interface SessionSnapshotLike {
-  state: 'IDLE' | 'COUNTDOWN' | 'WARN' | 'EXPIRED';
+  state: "IDLE" | "COUNTDOWN" | "WARN" | "EXPIRED";
   remainingMs: number;
   idleStartAt: number | null;
   countdownEndAt: number | null;

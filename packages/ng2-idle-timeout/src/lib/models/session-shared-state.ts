@@ -1,16 +1,16 @@
-import type { SessionState } from './session-state';
+import type { SessionState } from "./session-state";
 
 export const SHARED_STATE_VERSION = 3;
 
 export type SharedStateOperation =
-  | 'bootstrap'
-  | 'reset-by-activity'
-  | 'manual-extend'
-  | 'auto-extend'
-  | 'pause'
-  | 'resume'
-  | 'expire'
-  | 'config-change';
+  | "bootstrap"
+  | "reset-by-activity"
+  | "manual-extend"
+  | "auto-extend"
+  | "pause"
+  | "resume"
+  | "expire"
+  | "config-change";
 
 export interface LeaderInfo {
   id: string;
@@ -32,7 +32,7 @@ export interface SharedConfigPayload {
   warnBeforeMs: number;
   activityResetCooldownMs: number;
   storageKeyPrefix: string;
-  resumeBehavior: 'manual' | 'autoOnServerSync' | undefined;
+  resumeBehavior: "manual" | "autoOnServerSync" | undefined;
   resetOnWarningActivity: boolean;
   ignoreUserActivityWhenPaused: boolean;
   allowManualExtendWhenExpired: boolean;
@@ -59,7 +59,7 @@ export interface SharedSessionState {
   config: SharedConfigPayload;
 }
 
-export type SharedStateMessageType = 'state' | 'request-sync';
+export type SharedStateMessageType = "state" | "request-sync";
 
 export interface SharedStateMessageBase {
   sourceId: string;
@@ -68,14 +68,16 @@ export interface SharedStateMessageBase {
 }
 
 export interface SharedStateBroadcastMessage extends SharedStateMessageBase {
-  type: 'state';
+  type: "state";
   state: SharedSessionState;
 }
 
 export interface SharedStateRequestMessage extends SharedStateMessageBase {
-  type: 'request-sync';
+  type: "request-sync";
   reason?: string;
   expectReply?: boolean;
 }
 
-export type SharedStateMessage = SharedStateBroadcastMessage | SharedStateRequestMessage;
+export type SharedStateMessage =
+  | SharedStateBroadcastMessage
+  | SharedStateRequestMessage;

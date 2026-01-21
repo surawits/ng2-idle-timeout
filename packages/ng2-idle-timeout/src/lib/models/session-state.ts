@@ -1,4 +1,4 @@
-export type SessionState = 'IDLE' | 'COUNTDOWN' | 'WARN' | 'EXPIRED';
+export type SessionState = "IDLE" | "COUNTDOWN" | "WARN" | "EXPIRED";
 
 export interface SessionSnapshot {
   state: SessionState;

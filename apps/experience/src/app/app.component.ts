@@ -1,6 +1,6 @@
-﻿import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { CommonModule } from '@angular/common';
+﻿import { Component } from "@angular/core";
+import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
+import { CommonModule } from "@angular/common";
 
 interface NavItem {
   label: string;
@@ -10,20 +10,28 @@ interface NavItem {
 }
 
 @Component({
-  selector: 'app-root',
+  selector: "app-root",
   standalone: true,
   imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  templateUrl: "./app.component.html",
+  styleUrl: "./app.component.scss",
 })
 export class AppComponent {
   readonly navItems: NavItem[] = [
-    { label: 'Home', routerLink: '/' },
-    { label: 'Documentation', routerLink: '/docs' },
-    { label: 'Playground', routerLink: '/playground' },
-    { label: 'Observer Tab', externalUrl: '/playground?observer=1', target: '_blank' },
-    { label: 'FAQ', routerLink: '/faq' },
-    { label: 'GitHub', externalUrl: 'https://github.com/ng2-idle-timeout', target: '_blank' }
+    { label: "Home", routerLink: "/" },
+    { label: "Documentation", routerLink: "/docs" },
+    { label: "Playground", routerLink: "/playground" },
+    {
+      label: "Observer Tab",
+      externalUrl: "/playground?observer=1",
+      target: "_blank",
+    },
+    { label: "FAQ", routerLink: "/faq" },
+    {
+      label: "GitHub",
+      externalUrl: "https://github.com/ng2-idle-timeout",
+      target: "_blank",
+    },
   ];
 
   isMenuOpen = false;
@@ -36,4 +44,3 @@ export class AppComponent {
     this.isMenuOpen = false;
   }
 }
-
