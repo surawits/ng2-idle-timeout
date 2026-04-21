@@ -1,12 +1,13 @@
-# Unreleased
+# v0.3.7
 
 ## Highlights
 
 - **Robust Leader Election:** Replaced the legacy `localStorage` race-prone election with the browser-native **Web Locks API** (`navigator.locks`). This guarantees atomic, exclusive leadership claims across tabs, eliminating race conditions during rapid visibility changes or reloads.
+- **Improved Synchronization:** Fixed a bug where countdown timers would fluctuate in multi-tab environments. State transitions are now strictly managed by the leader tab, preventing premature transitions on followers due to slightly out-of-sync clocks.
 
 ## Testing
 
-- `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/leader-election.service.spec.ts`
+- `npm run test --workspace=ng2-idle-timeout -- --runTestsByPath src/lib/services/leader-election.service.spec.ts src/lib/services/session-timeout-cross-tab.spec.ts`
 
 # Sprint 8 Notes
 

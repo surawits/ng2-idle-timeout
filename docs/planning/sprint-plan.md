@@ -79,3 +79,9 @@
     - [x] 13a Replace localStorage election with Web Locks API in LeaderElectionService.
     - [x] 13b Update unit tests to mock navigator.locks and verify atomic acquisition.
     - [x] 13c Verify tests pass.
+    - [x] 13d Fix countdown timer fluctuations in multi-tab environments.
+
+- [x] Checkpoint 14 - Release v0.3.7
+  - [x] Bump version to 0.3.7.
+  - [x] Finalize RELEASE_NOTES.md.
+  - [x] Build and publish to npm.
