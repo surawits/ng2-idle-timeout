@@ -1,15 +1,15 @@
-﻿import {
+import {
   DestroyRef,
   Injectable,
   NgZone,
   computed,
   inject,
   signal,
-} from "@angular/core";
-import { toObservable } from "@angular/core/rxjs-interop";
+} from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 
-import type { SessionTimeoutConfig } from "../models/session-timeout-config";
-import { SESSION_TIMEOUT_CONFIG } from "../tokens/config.token";
+import type { SessionTimeoutConfig } from '../models/session-timeout-config';
+import { SESSION_TIMEOUT_CONFIG } from '../tokens/config.token';
 
 interface LeaderRecord {
   id: string;
@@ -19,20 +19,25 @@ interface LeaderRecord {
 export const HEARTBEAT_INTERVAL_MS = 1500;
 export const LEADER_TTL_MS = HEARTBEAT_INTERVAL_MS * 3;
 
-@Injectable({ providedIn: "root" })
+@Injectable({ providedIn: 'root' })
 export class LeaderElectionService {
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
   private readonly providedConfig = inject(SESSION_TIMEOUT_CONFIG, {
     optional: true,
   }) as SessionTimeoutConfig | undefined;
+
   private readonly leaderSignal = signal<string | null>(null);
   private readonly tabId = generateLeaderId();
+
   private storageKey: string | null = null;
   private heartbeatTimer: number | null = null;
   private watchdogTimer: number | null = null;
+
   private storage: Storage | null = this.resolveStorage();
   private isDisposed = false;
+
+  private abortController: AbortController | null = null;
 
   readonly leaderId = this.leaderSignal.asReadonly();
   readonly isLeader = computed(() => this.leaderSignal() === this.tabId);
@@ -54,19 +59,22 @@ export class LeaderElectionService {
     if (!this.storage || !this.storageKey || this.isDisposed) {
       return;
     }
-    this.evaluateLeadership();
+    this.startElection();
   }
 
   electLeader(): void {
-    this.evaluateLeadership();
+    this.startElection();
   }
 
   stepDown(): void {
-    if (!this.storage || !this.storageKey) {
-      return;
-    }
+    this.abortController?.abort();
+    this.abortController = null;
 
-    if (this.leaderSignal() === this.tabId) {
+    if (
+      this.storage &&
+      this.storageKey &&
+      this.leaderSignal() === this.tabId
+    ) {
       try {
         const record = this.readLeaderRecord();
         if (record?.id === this.tabId) {
@@ -74,7 +82,7 @@ export class LeaderElectionService {
         }
       } catch (error) {
         console.warn(
-          "[ng2-idle-timeout] Unable to release leader record",
+          '[ng2-idle-timeout] Unable to release leader record',
           error,
         );
       }
@@ -89,12 +97,12 @@ export class LeaderElectionService {
       this.cleanup();
     });
 
-    this.evaluateLeadership();
+    this.startElection();
     this.startWatchdog();
 
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", this.handleStorageEvent);
-      window.addEventListener("beforeunload", this.handleBeforeUnload);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', this.handleStorageEvent);
+      window.addEventListener('beforeunload', this.handleBeforeUnload);
     }
   }
 
@@ -103,11 +111,11 @@ export class LeaderElectionService {
       return;
     }
     this.isDisposed = true;
-    this.stopHeartbeat();
+    this.stepDown();
     this.stopWatchdog();
-    if (typeof window !== "undefined") {
-      window.removeEventListener("storage", this.handleStorageEvent);
-      window.removeEventListener("beforeunload", this.handleBeforeUnload);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('storage', this.handleStorageEvent);
+      window.removeEventListener('beforeunload', this.handleBeforeUnload);
     }
   }
 
@@ -117,6 +125,11 @@ export class LeaderElectionService {
 
   private readonly handleStorageEvent = (event: StorageEvent): void => {
     if (!this.storageKey || event.key !== this.storageKey) {
+      return;
+    }
+
+    // If we are leader, we ignore external writes (unless split-brain, but Lock protects us)
+    if (this.isLeader()) {
       return;
     }
 
@@ -130,21 +143,10 @@ export class LeaderElectionService {
 
       try {
         const record = JSON.parse(event.newValue) as LeaderRecord;
-        if (record.id === this.tabId) {
-          this.ensureHeartbeat();
-          this.leaderSignal.set(this.tabId);
-        } else {
-          const now = Date.now();
-          if (now - record.updatedAt > LEADER_TTL_MS) {
-            this.evaluateLeadership();
-            return;
-          }
-          this.stopHeartbeat();
-          this.leaderSignal.set(record.id);
-        }
+        this.leaderSignal.set(record.id);
       } catch (error) {
         console.warn(
-          "[ng2-idle-timeout] Invalid leader record from storage",
+          '[ng2-idle-timeout] Invalid leader record from storage',
           error,
         );
       }
@@ -152,22 +154,23 @@ export class LeaderElectionService {
   };
 
   private applyConfig(config: SessionTimeoutConfig | undefined): void {
-    const storageKeyPrefix = config?.storageKeyPrefix ?? "ng2-idle-timeout";
-    const appInstanceId = config?.appInstanceId ?? "ng2-idle-timeout";
+    const storageKeyPrefix = config?.storageKeyPrefix ?? 'ng2-idle-timeout';
+    const appInstanceId = config?.appInstanceId ?? 'ng2-idle-timeout';
     const nextKey = `${appInstanceId}:${storageKeyPrefix}:leader`;
 
     if (this.storageKey === nextKey) {
       return;
     }
 
+    this.stepDown(); // Release old lock if any
     this.storageKey = nextKey;
-    if (this.storage) {
-      this.evaluateLeadership();
+    if (this.storage && !this.isDisposed) {
+      this.startElection();
     }
   }
 
   private resolveStorage(): Storage | null {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
       return null;
     }
 
@@ -175,53 +178,60 @@ export class LeaderElectionService {
       return window.localStorage;
     } catch (error) {
       console.warn(
-        "[ng2-idle-timeout] Leader election storage unavailable",
+        '[ng2-idle-timeout] Leader election storage unavailable',
         error,
       );
       return null;
     }
   }
 
-  private evaluateLeadership(): void {
-    if (!this.storage || !this.storageKey || this.isDisposed) {
+  private startElection(): void {
+    if (!this.storageKey || this.isDisposed || this.abortController) {
       return;
     }
 
-    const record = this.readLeaderRecord();
-    const now = Date.now();
-
-    if (record?.id === this.tabId) {
-      this.leaderSignal.set(this.tabId);
-      this.ensureHeartbeat();
+    if (typeof navigator === 'undefined' || !navigator.locks) {
+      console.warn(
+        '[ng2-idle-timeout] Web Locks API unavailable. Leader election disabled.',
+      );
       return;
     }
 
-    if (!record || now - record.updatedAt > LEADER_TTL_MS) {
-      this.claimLeadership();
-      return;
-    }
+    this.abortController = new AbortController();
+    const lockName = `${this.storageKey}:lock`;
+    const signal = this.abortController.signal;
 
-    this.leaderSignal.set(record.id);
-    this.stopHeartbeat();
-  }
+    // Request EXCLUSIVE lock. This will queue if lock is held.
+    navigator.locks
+      .request(lockName, { mode: 'exclusive', signal }, async (lock) => {
+        if (!lock) {
+          return;
+        }
 
-  private claimLeadership(): void {
-    if (!this.storage || !this.storageKey || this.isDisposed) {
-      return;
-    }
+        // We have the lock!
+        this.zone.run(() => {
+          this.leaderSignal.set(this.tabId);
+          this.ensureHeartbeat();
+        });
 
-    const record: LeaderRecord = {
-      id: this.tabId,
-      updatedAt: Date.now(),
-    };
+        // Hold the lock until aborted
+        await new Promise<void>((resolve) => {
+          signal.addEventListener('abort', () => resolve());
+        });
 
-    try {
-      this.storage.setItem(this.storageKey, JSON.stringify(record));
-      this.leaderSignal.set(this.tabId);
-      this.ensureHeartbeat();
-    } catch (error) {
-      console.warn("[ng2-idle-timeout] Unable to persist leader record", error);
-    }
+        // Lock released
+        this.zone.run(() => {
+          if (this.leaderSignal() === this.tabId) {
+            this.leaderSignal.set(null);
+          }
+          this.stopHeartbeat();
+        });
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.error('[ng2-idle-timeout] Leader election error', err);
+        }
+      });
   }
 
   private readLeaderRecord(): LeaderRecord | null {
@@ -236,7 +246,7 @@ export class LeaderElectionService {
       }
       return JSON.parse(raw) as LeaderRecord;
     } catch (error) {
-      console.warn("[ng2-idle-timeout] Unable to read leader record", error);
+      console.warn('[ng2-idle-timeout] Unable to read leader record', error);
       return null;
     }
   }
@@ -245,22 +255,32 @@ export class LeaderElectionService {
     if (
       !this.storage ||
       this.watchdogTimer != null ||
-      typeof window === "undefined"
+      typeof window === 'undefined'
     ) {
       return;
     }
 
     this.zone.runOutsideAngular(() => {
       this.watchdogTimer = window.setInterval(() => {
+        if (this.isLeader()) {
+          return;
+        }
+
         this.zone.run(() => {
-          this.evaluateLeadership();
+          const record = this.readLeaderRecord();
+          if (record) {
+            const now = Date.now();
+            if (now - record.updatedAt <= LEADER_TTL_MS) {
+              this.leaderSignal.set(record.id);
+            }
+          }
         });
       }, HEARTBEAT_INTERVAL_MS);
     });
   }
 
   private stopWatchdog(): void {
-    if (this.watchdogTimer != null && typeof window !== "undefined") {
+    if (this.watchdogTimer != null && typeof window !== 'undefined') {
       window.clearInterval(this.watchdogTimer);
     }
     this.watchdogTimer = null;
@@ -270,14 +290,13 @@ export class LeaderElectionService {
     if (
       !this.storage ||
       this.heartbeatTimer != null ||
-      typeof window === "undefined"
+      typeof window === 'undefined'
     ) {
       return;
     }
 
-    if (!this.isLeader()) {
-      return;
-    }
+    // Immediate initial write
+    this.touchLeaderRecord();
 
     this.zone.runOutsideAngular(() => {
       this.heartbeatTimer = window.setInterval(() => {
@@ -295,7 +314,7 @@ export class LeaderElectionService {
   }
 
   private stopHeartbeat(): void {
-    if (this.heartbeatTimer != null && typeof window !== "undefined") {
+    if (this.heartbeatTimer != null && typeof window !== 'undefined') {
       window.clearInterval(this.heartbeatTimer);
     }
     this.heartbeatTimer = null;
@@ -320,7 +339,7 @@ export class LeaderElectionService {
       this.storage.setItem(this.storageKey, JSON.stringify(record));
     } catch (error) {
       console.warn(
-        "[ng2-idle-timeout] Unable to update leader heartbeat",
+        '[ng2-idle-timeout] Unable to update leader heartbeat',
         error,
       );
     }
@@ -329,8 +348,8 @@ export class LeaderElectionService {
 
 function generateLeaderId(): string {
   if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
   ) {
     return crypto.randomUUID();
   }

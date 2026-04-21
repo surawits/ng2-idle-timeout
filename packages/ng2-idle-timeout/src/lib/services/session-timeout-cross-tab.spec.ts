@@ -1079,4 +1079,25 @@ describe("SessionTimeoutService cross-tab sync", () => {
     expect(leaderStates.length).toBeGreaterThan(0);
     expect(leaderStates.pop()?.leader?.epoch).toBe(6);
   });
+
+  it("follower does NOT transition to COUNTDOWN automatically via handleTick", async () => {
+    const leader = TestBed.inject(LeaderElectionService);
+    jest.spyOn(leader, "isLeader").mockReturnValue(false);
+    jest.spyOn(leader, "leaderId").mockReturnValue("remote-tab");
+
+    service.start();
+    await flushAsync();
+
+    // Initial state should be IDLE
+    expect(snapshot().state).toBe("IDLE");
+
+    // Advance time past idleGraceMs
+    time.setNow(baseConfig.idleGraceMs + 100);
+
+    // Trigger ticker
+    manualTick();
+
+    // Follower should stay in IDLE
+    expect(snapshot().state).toBe("IDLE");
+  });
 });

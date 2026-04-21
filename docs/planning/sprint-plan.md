@@ -73,3 +73,9 @@
     - [x] Sync planning records and document republish guidance.
     - [x] Documented 0.3.6 fallback after npm rejected the 0.3.4 republish.
     - [x] Published 0.3.6 to npm via updated publish:lib workflow.
+
+- [x] Checkpoint 13 - Robust Leader Election
+  - Sub-checkpoints:
+    - [x] 13a Replace localStorage election with Web Locks API in LeaderElectionService.
+    - [x] 13b Update unit tests to mock navigator.locks and verify atomic acquisition.
+    - [x] 13c Verify tests pass.

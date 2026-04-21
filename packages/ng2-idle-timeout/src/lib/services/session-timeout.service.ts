@@ -747,9 +747,20 @@ export class SessionTimeoutService {
       return;
     }
 
+    const isLeader = this.leaderElection ? this.leaderElection.isLeader() : true;
+
     if (snapshot.state === "IDLE") {
       const elapsed = timestamp - snapshot.idleStartAt;
       if (elapsed >= config.idleGraceMs) {
+        if (!isLeader) {
+          const remainingToGraceEnd = Math.max(0, config.idleGraceMs - elapsed);
+          this.updateSnapshot(
+            { remainingMs: remainingToGraceEnd },
+            "auto-extend",
+          );
+          return;
+        }
+
         const countdownEndAt = timestamp + config.countdownMs;
         this.updateSnapshot(
           {
@@ -774,6 +785,10 @@ export class SessionTimeoutService {
     const remaining = Math.max(0, snapshot.countdownEndAt - timestamp);
 
     if (remaining === 0) {
+      if (!isLeader) {
+        this.updateSnapshot({ remainingMs: 0 }, "auto-extend");
+        return;
+      }
       this.updateSnapshot({ state: "EXPIRED", remainingMs: 0 }, "expire");
       this.emitEvent("Expired");
       this.broadcastCrossTab("expire", {
@@ -785,6 +800,10 @@ export class SessionTimeoutService {
 
     if (remaining <= config.warnBeforeMs) {
       if (snapshot.state !== "WARN") {
+        if (!isLeader) {
+          this.updateSnapshot({ remainingMs: remaining }, "auto-extend");
+          return;
+        }
         this.updateSnapshot(
           { state: "WARN", remainingMs: remaining },
           "auto-extend",
@@ -797,6 +816,10 @@ export class SessionTimeoutService {
     }
 
     if (snapshot.state !== "COUNTDOWN") {
+      if (!isLeader) {
+        this.updateSnapshot({ remainingMs: remaining }, "auto-extend");
+        return;
+      }
       this.updateSnapshot(
         { state: "COUNTDOWN", remainingMs: remaining },
         "auto-extend",
